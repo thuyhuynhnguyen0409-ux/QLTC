@@ -18,8 +18,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const apiKey = "AIzaSy..."; // Thay bằng API Key Gemini của bạn
-
+        // Thay đổi dòng 26 trong file của bạn thành:
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSy...";
         // State
         let user = null;
         let expenses = [];
