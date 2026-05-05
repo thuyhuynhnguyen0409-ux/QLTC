@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Finance Master AI - Moju Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIGURATION ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'moju-finance';
+        const apiKey = ""; // Gemini API Key
+
+        // --- STATE ---
+        let user = null;
+        let expenses = [];
+        let goals = [];
+        let config = { salary: 0, fixedCosts: [], savings: 0, enjoyment: 0 };
+        let currentView = 'list';
+        let currentFilter = 'month';
+
+        const categories = [
+            { id: 'food', name: 'Ăn uống', icon: '🍲', color: 'bg-orange-100 text-orange-600' },
+            { id: 'transport', name: 'Di chuyển', icon: '🚲', color: 'bg-blue-100 text-blue-600' },
+            { id: 'shopping', name: 'Mua sắm', icon: '🛍️', color: 'bg-pink-100 text-pink-600' },
+            { id: 'bills', name: 'Hóa đơn', icon: '📄', color: 'bg-purple-100 text-purple-600' },
+            { id: 'other', name: 'Khác', icon: '✨', color: 'bg-slate-100 text-slate-600' }
+        ];
+
+        // --- AUTH LOGIC ---
+        window.handleAuth = async (type) => {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            const errorEl = document.getElementById('authError');
+            if(!email || !password) return;
+
+            try {
+                if (type === 'login') {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } else {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                }
+            } catch (err) {
+                errorEl.innerText = "Lỗi: " + err.message;
+                errorEl.classList.remove('hidden');
+            }
+        };
+
+        window.handleLogout = () => signOut(auth);
+
+        onAuthStateChanged(auth, (u) => {
+            user = u;
+            if (user) {
+                document.getElementById('authScreen').classList.add('hidden');
+                document.getElementById('mainScreen').classList.remove('hidden');
+                setupListeners();
+            } else {
+                document.getElementById('authScreen').classList.remove('hidden');
+                document.getElementById('mainScreen').classList.add('hidden');
+            }
+        });
+
+        // --- DATABASE LISTENERS ---
+        function setupListeners() {
+            if (!user) return;
+            
+            // Lắng nghe cấu hình ngân sách
+            onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'finance'), (snap) => {
+                if (snap.exists()) {
+                    config = snap.data();
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    document.getElementById('setupPrompt').classList.add('hidden');
+                } else {
+                    document.getElementById('setupPrompt').classList.remove('hidden');
+                    document.getElementById('dashboard').classList.add('hidden');
+                }
+                updateUI();
+            });
+
+            // Lắng nghe chi tiêu
+            onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'expenses'), (snap) => {
+                expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                expenses.sort((a,b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
+                updateUI();
+            });
+
+            // Lắng nghe mục tiêu
+            onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'goals'), (snap) => {
+                goals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                updateUI();
+            });
+        }
+
+        // --- BUSINESS LOGIC ---
+        window.initBudget = async () => {
+            const salary = window.parseCurrency(document.getElementById('salaryInput').value);
+            const savings = window.parseCurrency(document.getElementById('savingsInput').value);
+            const fixedCosts = [];
+            document.querySelectorAll('.fixed-cost-row').forEach(row => {
+                const name = row.querySelector('.fc-name').value;
+                const amount = window.parseCurrency(row.querySelector('.fc-amount').value);
+                if(name && amount) fixedCosts.push({name, amount});
+            });
+
+            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'finance'), {
+                salary, savings, fixedCosts
+            });
+            window.toggleConfigModal(false);
+        };
+
+        window.addExpense = async () => {
+            const name = document.getElementById('expName').value;
+            const amount = window.parseCurrency(document.getElementById('expAmount').value);
+            const category = document.getElementById('expCategory').value;
+            if(!name || !amount) return;
+
+            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'expenses'), {
+                name, amount, category, date: serverTimestamp()
+            });
+            document.getElementById('expName').value = '';
+            document.getElementById('expAmount').value = '';
+        };
+
+        // --- UI UPDATES ---
+        function updateUI() {
+            const totalFixed = (config.fixedCosts || []).reduce((s,f) => s + f.amount, 0);
+            const now = new Date();
+            const filtered = expenses.filter(e => {
+                if(!e.date) return false;
+                const d = new Date(e.date.seconds * 1000);
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            });
+
+            const totalSpent = filtered.reduce((s,e) => s + e.amount, 0);
+            const remainingTotal = config.salary - totalFixed - totalSpent - config.savings;
+            
+            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            const remainDays = lastDay - now.getDate() + 1;
+            const daily = Math.max(0, remainingTotal / remainDays);
+
+            document.getElementById('dailyVal').innerText = window.formatMoney(daily);
+            document.getElementById('salaryDisplay').innerText = window.formatMoney(config.salary);
+            document.getElementById('totalFiltered').innerText = window.formatMoney(totalSpent);
+
+            renderList(filtered);
+            updateMainChart(totalFixed, totalSpent, Math.max(0, remainingTotal), config.savings);
+        }
+
+        function renderList(list) {
+            const container = document.getElementById('expenseList');
+            container.innerHTML = list.length ? '' : '<p class="text-center py-10 opacity-40">Chưa có dữ liệu</p>';
+            list.forEach(e => {
+                const cat = categories.find(c => c.id === e.category) || categories[4];
+                container.innerHTML += `
+                    <div class="flex justify-between items-center bg-white p-4 rounded-2xl mb-3 shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="${cat.color} w-10 h-10 rounded-xl flex items-center justify-center text-lg">${cat.icon}</div>
+                            <div>
+                                <p class="font-bold text-sm">${e.name}</p>
+                                <p class="text-[10px] uppercase font-bold opacity-40">${cat.name}</p>
+                            </div>
+                        </div>
+                        <b class="text-rose-500">-${window.formatMoney(e.amount)}</b>
+                    </div>
+                `;
+            });
+        }
+
+        function updateMainChart(fixed, spent, remain, saved) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            if (window.myChart) window.myChart.destroy();
+            window.myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [fixed, spent, remain, saved],
+                        backgroundColor: ['#6366f1', '#f43f5e', '#10b981', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { cutout: '80%', plugins: { legend: { display: false } } }
+            });
+        }
+
+        // --- UTILS ---
+        window.formatCurrencyInput = (i) => {
+            let v = i.value.replace(/\D/g, "");
+            i.value = v ? new Intl.NumberFormat('vi-VN').format(parseInt(v)) : "";
+        };
+        window.parseCurrency = (s) => parseInt(String(s).replace(/\D/g, "")) || 0;
+        window.formatMoney = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n)) + 'đ';
+        window.toggleConfigModal = (s) => document.getElementById('configModal').classList.toggle('hidden', !s);
+        window.addFixedCostRow = () => {
+            const div = document.createElement('div');
+            div.className = "fixed-cost-row flex gap-2 mb-2";
+            div.innerHTML = `<input type="text" placeholder="Tên phí" class="fc-name flex-1 p-2 bg-slate-100 rounded-lg text-xs"><input type="text" placeholder="Số tiền" oninput="window.formatCurrencyInput(this)" class="fc-amount w-24 p-2 bg-slate-100 rounded-lg text-xs font-bold">`;
+            document.getElementById('fixedCostsList').appendChild(div);
+        };
+
+        window.suggestFood = async () => {
+            const btn = document.getElementById('btnSuggest');
+            btn.innerText = "Đang nghĩ...";
+            const daily = document.getElementById('dailyVal').innerText;
+            const note = document.getElementById('chefNote').value;
+            
+            const prompt = `Gợi ý 1 mâm cơm VN (3 món) với ngân sách ${daily}. Yêu cầu: ${note}. Trả về cực ngắn gọn.`;
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                const data = await res.json();
+                document.getElementById('aiChefText').innerText = data.candidates[0].content.parts[0].text;
+            } catch (e) {
+                document.getElementById('aiChefText').innerText = "Thịt kho tàu + Canh rau ngót + Cà pháo. Ngon bổ rẻ!";
+            }
+            btn.innerText = "Gợi ý";
+        };
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+    <!-- SCREEN 1: AUTH -->
+    <div id="authScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100">
+            <div class="text-center mb-10">
+                <div class="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 text-white shadow-lg">💰</div>
+                <h1 class="text-2xl font-black">Finance AI</h1>
+                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">mojulicyvkrwoxbjpsem</p>
+            </div>
+            <div class="space-y-4">
+                <input type="email" id="authEmail" placeholder="Email" class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none transition-all">
+                <input type="password" id="authPassword" placeholder="Mật khẩu" class="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none transition-all">
+                <div id="authError" class="hidden p-3 bg-rose-50 text-rose-500 text-xs font-bold rounded-xl text-center"></div>
+                <button onclick="handleAuth('login')" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black shadow-lg">ĐĂNG NHẬP</button>
+                <button onclick="handleAuth('signup')" class="w-full text-slate-400 py-2 font-bold text-xs">Chưa có tài khoản? Đăng ký ngay</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCREEN 2: MAIN APP -->
+    <div id="mainScreen" class="hidden min-h-screen pb-20">
+        <!-- Header -->
+        <nav class="p-6 flex justify-between items-center max-w-6xl mx-auto">
+            <h2 class="text-xl font-black">Finance <span class="text-indigo-600">AI</span></h2>
+            <button onclick="handleLogout()" class="text-xs font-black text-rose-500 bg-rose-50 px-4 py-2 rounded-xl">THOÁT</button>
+        </nav>
+
+        <div class="max-w-6xl mx-auto px-4">
+            <!-- Setup Prompt -->
+            <div id="setupPrompt" class="hidden text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
+                <p class="text-4xl mb-4">🏦</p>
+                <h3 class="text-xl font-black mb-6">Thiết lập ví đầu tiên</h3>
+                <button onclick="toggleConfigModal(true)" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg">Bắt đầu ngay</button>
+            </div>
+
+            <div id="dashboard" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Left: Stats & List -->
+                <div class="lg:col-span-8 space-y-6">
+                    <!-- AI Chef -->
+                    <div class="bg-emerald-600 p-8 rounded-[2.5rem] text-white shadow-xl">
+                        <h3 class="font-black mb-4 flex items-center gap-2">👩‍🍳 AI Chef Gợi Ý</h3>
+                        <div class="bg-white/10 p-4 rounded-2xl mb-4 min-h-[60px] flex items-center italic text-sm">
+                            <span id="aiChefText">Hãy nhập yêu cầu bên dưới để AI gợi ý mâm cơm theo ví của bạn.</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="chefNote" placeholder="Ví dụ: Ăn cá, không cay..." class="flex-1 p-3 bg-emerald-700/50 rounded-xl outline-none placeholder:text-emerald-200">
+                            <button id="btnSuggest" onclick="suggestFood()" class="bg-white text-emerald-600 px-6 rounded-xl font-black text-sm">Gợi ý</button>
+                        </div>
+                    </div>
+
+                    <!-- Expense List -->
+                    <div class="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-black text-slate-400 text-xs uppercase tracking-widest">Chi tiêu gần đây</h3>
+                            <span id="totalFiltered" class="font-black text-indigo-600">0đ</span>
+                        </div>
+                        <div id="expenseList" class="max-h-[500px] overflow-y-auto pr-2"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Summary & Entry -->
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="bg-white p-8 rounded-[2.5rem] shadow-xl text-center relative border border-slate-100">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mức chi đề xuất / ngày</p>
+                        <h2 id="dailyVal" class="text-4xl font-black text-indigo-600 mb-6">0đ</h2>
+                        <div class="relative w-40 h-40 mx-auto mb-6">
+                            <canvas id="mainChart"></canvas>
+                            <div class="absolute inset-0 flex flex-center items-center justify-center flex-col pointer-events-none">
+                                <span class="text-[9px] font-bold text-slate-400 uppercase">Lương</span>
+                                <span id="salaryDisplay" class="text-xs font-black">0đ</span>
+                            </div>
+                        </div>
+                        <button onclick="toggleConfigModal(true)" class="w-full py-3 bg-slate-50 text-slate-400 font-bold text-xs rounded-xl">Cấu hình ngân sách ⚙️</button>
+                    </div>
+
+                    <!-- New Entry -->
+                    <div class="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl">
+                        <h3 class="font-black mb-6 text-indigo-400">Ghi chép mới</h3>
+                        <div class="space-y-4">
+                            <input type="text" id="expName" placeholder="Tên khoản chi..." class="w-full p-4 bg-slate-800 rounded-2xl outline-none text-sm">
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="expAmount" oninput="formatCurrencyInput(this)" placeholder="Số tiền" class="p-4 bg-slate-800 rounded-2xl outline-none text-sm font-black text-rose-400">
+                                <select id="expCategory" class="p-4 bg-slate-800 rounded-2xl outline-none text-sm">
+                                    <option value="food">Ăn uống</option>
+                                    <option value="transport">Di chuyển</option>
+                                    <option value="shopping">Mua sắm</option>
+                                    <option value="bills">Hóa đơn</option>
+                                    <option value="other">Khác</option>
+                                </select>
+                            </div>
+                            <button onclick="addExpense()" class="w-full bg-indigo-600 py-4 rounded-2xl font-black shadow-lg active:scale-95 transition-all">LƯU LẠI</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cấu hình -->
+    <div id="configModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl">
+            <h2 class="text-xl font-black mb-6">Thiết lập tài chính</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Tổng thu nhập tháng</label>
+                    <input type="text" id="salaryInput" oninput="formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-black text-indigo-600">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Khoản muốn tích lũy</label>
+                    <input type="text" id="savingsInput" oninput="formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-black text-emerald-500">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Chi phí cố định (Tiền nhà, điện nước...)</label>
+                    <div id="fixedCostsList"></div>
+                    <button onclick="addFixedCostRow()" class="text-[10px] font-black text-indigo-600 mt-2">+ Thêm dòng chi phí</button>
+                </div>
+                <div class="flex gap-2 pt-4">
+                    <button onclick="toggleConfigModal(false)" class="flex-1 py-4 bg-slate-100 rounded-2xl font-bold">Hủy</button>
+                    <button onclick="initBudget()" class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">Hoàn tất</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
