@@ -292,37 +292,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
             });
         }
 
-        async function suggestFood() {
-            const btn = document.getElementById('btnSuggest');
-            if (!btn) return;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = "👩‍🍳 Đang lên thực đơn...";
-            
-            const dailyValStr = document.getElementById('dailyVal')?.innerText || "0";
-            const dailyVal = window.parseCurrency(dailyValStr);
-            const userPref = document.getElementById('chefNote')?.value.trim() || "không có yêu cầu cụ thể";
-            
-            const prompt = `Bạn là một Đầu bếp gia đình Việt Nam chuyên nghiệp. 
-            Nhiệm vụ: Gợi ý một mâm cơm gia đình hoàn chỉnh (Mặn, Canh, Xào). 
-            Ngân sách đi chợ gợi ý: ${dailyVal > 0 ? dailyVal + " VNĐ" : "linh hoạt"}. 
-            Yêu cầu từ người dùng: ${userPref}.
-            Trình bày: "Mâm cơm: [Món 1] + [Món 2] + [Món 3]". Thêm 1 câu bình luận ngắn về dinh dưỡng hoặc tiết kiệm.
-            Ngắn gọn dưới 40 từ.`;
 
-            try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
-                const data = await res.json();
-                const suggestion = data.candidates?.[0]?.content?.parts?.[0]?.text || "Mâm cơm: Cá thu sốt cà + Canh bí nấu tôm + Rau muống xào tỏi. Rất đủ chất!";
-                document.getElementById('aiChefText').innerText = suggestion;
-            } catch (e) {
-                document.getElementById('aiChefText').innerText = "Mâm cơm: Thịt kho tiêu + Canh cải ngọt + Đậu hũ rán. Đơn giản mà ngon!";
-            } finally {
-                btn.innerHTML = originalText;
-            }
-        }
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
