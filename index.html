@@ -8,64 +8,55 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module">
         
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Config
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // Firebase Config - Đảm bảo biến __firebase_config đã được định nghĩa
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const apiKey = "";
+        const apiKey = "AIzaSy..."; // Thay bằng API Key Gemini của bạn
 
         // State
         let user = null;
         let expenses = [];
         let goals = [];
         let config = { salary: 0, fixedCosts: [], savings: 0, enjoyment: 0 };
-        let currentView = 'list'; // 'list' or 'stats'
+        let currentView = 'list'; 
         let currentFilter = 'month'; 
-        let lastSuggestions = [];
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        
-        // THÊM ĐOẠN NÀY: Kiểm tra đăng nhập ngay khi trang tải
+
+        // Kiểm tra trạng thái đăng nhập
         onAuthStateChanged(auth, (u) => {
             if (!u) {
-                // Nếu không có user, chuyển hướng về trang login/auth
-                // Lưu ý: Đảm bảo file auth.html nằm cùng cấp thư mục
                 window.location.href = "auth.html";
             } else {
                 user = u;
                 setupListeners();
             }
         });
-        // Categories
+
         const categories = [
             { id: 'food', name: 'Ăn uống', icon: '🍲', color: 'bg-orange-100 text-orange-600' },
-            { id: 'transport', name: 'Di chuyển', icon: '評', color: 'bg-blue-100 text-blue-600' },
+            { id: 'transport', name: 'Di chuyển', icon: '🛵', color: 'bg-blue-100 text-blue-600' },
             { id: 'shopping', name: 'Mua sắm', icon: '🛍️', color: 'bg-pink-100 text-pink-600' },
             { id: 'bills', name: 'Hóa đơn', icon: '📄', color: 'bg-purple-100 text-purple-600' },
             { id: 'other', name: 'Khác', icon: '✨', color: 'bg-slate-100 text-slate-600' }
         ];
 
-        // Utils
-        window.formatCurrencyInput = function(i) {
+        // Utils cho tiền tệ
+        window.formatCurrencyInput = (i) => {
             let v = i.value.replace(/\D/g, "");
             i.value = v ? new Intl.NumberFormat('vi-VN').format(parseInt(v)) : "";
         };
-        window.parseCurrency = function(s) { return parseInt(String(s).replace(/\D/g, "")) || 0; };
-        window.formatMoney = function(n) { return new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ'; };
+        window.parseCurrency = (s) => parseInt(String(s).replace(/\D/g, "")) || 0;
+        window.formatMoney = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
 
-        // Global functions
-        window.initBudget = initBudget;
-        window.addExpense = addExpense;
-        window.addGoal = addGoal;
+        // Gắn hàm vào window để gọi từ HTML
         window.setView = (v) => { currentView = v; updateUI(); };
         window.setFilter = (f) => { currentFilter = f; updateUI(); };
-        window.suggestFood = suggestFood;
         window.toggleConfigModal = (show) => {
             if (show) populateConfigFields();
             const modal = document.getElementById('configModal');
@@ -74,33 +65,10 @@
                 document.body.style.overflow = show ? 'hidden' : 'auto';
             }
         };
-        window.addFixedCostRow = addFixedCostRow;
-        window.removeFixedCostRow = (btn) => btn.closest('.fixed-cost-row').remove();
-
-        // Auth
-        // Tìm hàm này và sửa lại
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    // await signInAnonymously(auth); // <--- XÓA DÒNG NÀY ĐỂ KHÔNG TỰ ĐĂNG NHẬP ẨN DANH
-                    console.log("Waiting for user to log in via auth.html...");
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
-            }
-        };
-        initAuth();
-
-        onAuthStateChanged(auth, (u) => {
-            user = u;
-            if (user) setupListeners();
-        });
 
         function setupListeners() {
             if (!user) return;
-
+            // Lắng nghe cài đặt tài chính
             onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'finance'), (snap) => {
                 if (snap.exists()) {
                     config = snap.data();
@@ -111,102 +79,48 @@
                     document.getElementById('dashboard')?.classList.add('hidden');
                 }
                 updateUI();
-            }, (err) => console.error("Settings error:", err));
+            });
 
+            // Lắng nghe chi tiêu
             onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'expenses'), (snap) => {
                 expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 expenses.sort((a,b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
                 updateUI();
-            }, (err) => console.error("Expenses error:", err));
+            });
 
+            // Lắng nghe mục tiêu
             onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'goals'), (snap) => {
                 goals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 updateUI();
-            }, (err) => console.error("Goals error:", err));
+            });
         }
 
-        function addFixedCostRow(name = '', amount = '') {
-            const container = document.getElementById('fixedCostsList');
-            if (!container) return;
-            const row = document.createElement('div');
-            row.className = 'fixed-cost-row flex gap-2 mb-3 items-center';
-            row.innerHTML = `
-                <input type="text" placeholder="Tên phí..." value="${name}" class="fc-name flex-1 p-3 bg-slate-50 rounded-xl text-xs outline-none border-2 border-transparent focus:border-indigo-100">
-                <input type="text" placeholder="Số tiền" value="${amount}" oninput="window.formatCurrencyInput(this)" class="fc-amount w-28 p-3 bg-slate-50 rounded-xl text-xs font-bold outline-none border-2 border-transparent focus:border-indigo-100">
-                <button onclick="window.removeFixedCostRow(this)" class="text-rose-500 p-2 hover:bg-rose-50 rounded-lg shrink-0">✕</button>
-            `;
-            container.appendChild(row);
-        }
+        async function suggestFood() {
+            const btn = document.getElementById('btnSuggest');
+            const chefText = document.getElementById('aiChefText');
+            if (!btn || !apiKey) return;
+            
+            btn.disabled = true;
+            btn.innerHTML = "👩‍🍳 Đang tính...";
+            
+            const dailyVal = window.parseCurrency(document.getElementById('dailyVal')?.innerText || "0");
+            const note = document.getElementById('chefNote')?.value || "đa dạng";
 
-        function populateConfigFields() {
-            const salaryInput = document.getElementById('salaryInput');
-            const savingsInput = document.getElementById('savingsInput');
-            const enjoymentInput = document.getElementById('enjoymentInput');
-            
-            if (salaryInput) salaryInput.value = config.salary ? new Intl.NumberFormat('vi-VN').format(config.salary) : "";
-            if (savingsInput) savingsInput.value = config.savings ? new Intl.NumberFormat('vi-VN').format(config.savings) : "";
-            if (enjoymentInput) enjoymentInput.value = config.enjoyment ? new Intl.NumberFormat('vi-VN').format(config.enjoyment) : "";
-            
-            const container = document.getElementById('fixedCostsList');
-            if (container) {
-                container.innerHTML = '';
-                if (config.fixedCosts && config.fixedCosts.length > 0) {
-                    config.fixedCosts.forEach(fc => addFixedCostRow(fc.name, new Intl.NumberFormat('vi-VN').format(fc.amount)));
-                } else {
-                    addFixedCostRow();
-                }
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Gợi ý mâm cơm VN (Mặn, Canh, Xào) với ngân sách ${dailyVal}đ. Ghi chú: ${note}. Ngắn gọn < 40 từ.` }] }] })
+                });
+                const data = await res.json();
+                chefText.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Cá kho + Canh chua + Rau luộc.";
+            } catch (e) {
+                chefText.innerText = "Thịt kho trứng + Canh rau ngót + Đậu hũ chiên.";
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "🍚 Gợi ý";
             }
         }
-
-        async function initBudget() {
-            if (!user) return;
-            const salary = window.parseCurrency(document.getElementById('salaryInput')?.value || "0");
-            const savings = window.parseCurrency(document.getElementById('savingsInput')?.value || "0");
-            const enjoyment = window.parseCurrency(document.getElementById('enjoymentInput')?.value || "0");
-            const fixedCosts = [];
-            document.querySelectorAll('.fixed-cost-row').forEach(row => {
-                const name = row.querySelector('.fc-name')?.value.trim();
-                const amount = window.parseCurrency(row.querySelector('.fc-amount')?.value || "0");
-                if (name && amount > 0) fixedCosts.push({ name, amount });
-            });
-            if (salary < 1000) return;
-            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'finance'), {
-                salary, fixedCosts, savings, enjoyment
-            });
-            window.toggleConfigModal(false);
-        }
-
-        async function addExpense() {
-            if (!user) return;
-            const nameInput = document.getElementById('expName');
-            const amountInput = document.getElementById('expAmount');
-            const catSelect = document.getElementById('expCategory');
-            if (!nameInput || !amountInput || !catSelect) return;
-            const name = nameInput.value.trim();
-            const amount = window.parseCurrency(amountInput.value);
-            const catId = catSelect.value;
-            if (!name || amount <= 0) return;
-            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'expenses'), {
-                name, amount, category: catId, date: serverTimestamp()
-            });
-            nameInput.value = '';
-            amountInput.value = '';
-        }
-
-        async function addGoal() {
-            if (!user) return;
-            const nameInput = document.getElementById('goalName');
-            const targetInput = document.getElementById('goalTarget');
-            if (!nameInput || !targetInput) return;
-            const name = nameInput.value.trim();
-            const target = window.parseCurrency(targetInput.value);
-            if (!name || target <= 0) return;
-            await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'goals'), {
-                name, target, createdAt: serverTimestamp()
-            });
-            nameInput.value = '';
-            targetInput.value = '';
-        }
+        window.suggestFood = suggestFood;
 
         function updateUI() {
             const totalFixed = (config.fixedCosts || []).reduce((s,f) => s+f.amount, 0);
@@ -412,11 +326,7 @@
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .mobile-height { height: calc(100vh - 220px); }
-        @media (max-width: 768px) { .mobile-height { height: 450px; } }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
     </style>
 </head>
