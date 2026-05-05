@@ -122,11 +122,13 @@
     <script>
         // Cấu hình Supabase
         // LƯU Ý: Thay 'YOUR_SUPABASE_URL' bằng URL thực tế từ Supabase Dashboard của bạn.
-        const SUPABASE_URL = 'https://mojulicyvkrwoxbjpsem.supabase.co/rest/v1/'; 
-        const SUPABASE_KEY = 'sb_secret_VnqbZIkgaH4-AwuqCFE9ug_fq3Uug4j';
+// Cấu hình Supabase - Tách biệt thông tin nhạy cảm
+// Sử dụng toán tử logic để ưu tiên lấy từ biến môi trường của nền tảng (nếu có)
+const SUPABASE_URL = window.ENV_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co'; 
+const SUPABASE_KEY = window.ENV_SUPABASE_KEY || ''; // Để trống để điền trên Vercel
 
-        // Đổi tên biến từ 'supabase' thành 'supabaseClient' để tránh xung đột với thư viện gốc
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Khởi tạo client
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         async function handleLogin(provider) {
             const buttons = document.getElementById('auth-buttons');
