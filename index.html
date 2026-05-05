@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module">
+        
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -27,7 +28,20 @@
         let currentView = 'list'; // 'list' or 'stats'
         let currentFilter = 'month'; 
         let lastSuggestions = [];
-
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // THÊM ĐOẠN NÀY: Kiểm tra đăng nhập ngay khi trang tải
+        onAuthStateChanged(auth, (u) => {
+            if (!u) {
+                // Nếu không có user, chuyển hướng về trang login/auth
+                // Lưu ý: Đảm bảo file auth.html nằm cùng cấp thư mục
+                window.location.href = "auth.html";
+            } else {
+                user = u;
+                setupListeners();
+            }
+        });
         // Categories
         const categories = [
             { id: 'food', name: 'Ăn uống', icon: '🍲', color: 'bg-orange-100 text-orange-600' },
