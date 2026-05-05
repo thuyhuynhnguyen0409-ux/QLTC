@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng Nhập Hệ Thống</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Tích hợp Supabase JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
@@ -24,10 +23,6 @@
             width: 100%;
             max-width: 400px;
             padding: 2.5rem;
-            transition: transform 0.3s ease;
-        }
-        .login-card:hover {
-            transform: translateY(-5px);
         }
         .btn-social {
             display: flex;
@@ -41,44 +36,21 @@
             transition: all 0.2s;
             margin-bottom: 1rem;
             cursor: pointer;
-            border: 2px solid transparent;
         }
-        .btn-email {
-            background-color: #f3f4f6;
-            color: #1f2937;
-        }
-        .btn-email:hover {
-            background-color: #e5e7eb;
-            border-color: #d1d5db;
-        }
-        .btn-facebook {
-            background-color: #1877f2;
-            color: white;
-        }
-        .btn-facebook:hover {
-            background-color: #166fe5;
-            box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
-        }
+        .btn-email { background-color: #f3f4f6; color: #1f2937; }
+        .btn-email:hover { background-color: #e5e7eb; }
+        .btn-facebook { background-color: #1877f2; color: white; }
+        .btn-facebook:hover { background-color: #166fe5; box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3); }
+        
         .loader {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
+            border-top: 3px solid #6366f1;
             border-radius: 50%;
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             animation: spin 1s linear infinite;
-            display: none;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .error-msg {
-            color: #ef4444;
-            font-size: 0.875rem;
-            margin-top: 1rem;
-            text-align: center;
-            display: none;
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -89,12 +61,13 @@
             <p class="text-gray-500">Vui lòng chọn phương thức đăng nhập</p>
         </div>
 
-        <div id="auth-buttons">
-            <button onclick="handleLogin('email')" class="btn-social btn-email">
+        <!-- Khối chọn phương thức -->
+        <div id="auth-methods">
+            <button onclick="showEmailInput()" class="btn-social btn-email">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
                     <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/>
                 </svg>
-                <span>Đăng nhập Email (OTP)</span>
+                <span>Đăng nhập với Email</span>
             </button>
 
             <button onclick="handleLogin('facebook')" class="btn-social btn-facebook">
@@ -105,80 +78,112 @@
             </button>
         </div>
 
-        <div id="status-container" class="hidden flex flex-col items-center mt-4">
-            <div class="loader mb-2" id="loader"></div>
-            <p id="status-text" class="text-sm text-gray-600 font-medium"></p>
+        <!-- Khối nhập Email (Ẩn mặc định) -->
+        <div id="email-form" class="hidden space-y-4">
+            <input type="email" id="email-input" placeholder="ten@email.com" 
+                class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none transition-all">
+            <button onclick="handleLogin('email')" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all">
+                Gửi mã xác nhận (OTP)
+            </button>
+            <button onclick="hideEmailInput()" class="w-full text-sm text-gray-400 hover:text-gray-600 transition-all">
+                Quay lại
+            </button>
         </div>
 
-        <div id="error-display" class="error-msg"></div>
+        <!-- Trạng thái chờ -->
+        <div id="status-container" class="hidden flex flex-col items-center mt-6">
+            <div class="loader mb-3"></div>
+            <p id="status-text" class="text-sm text-gray-600 font-medium text-center"></p>
+        </div>
+
+        <!-- Thông báo lỗi -->
+        <div id="error-display" class="hidden mt-4 p-3 bg-red-50 text-red-500 text-xs rounded-lg text-center font-medium"></div>
 
         <div class="mt-8 text-center">
-            <p class="text-xs text-gray-400">
-                Bằng cách đăng nhập, bạn đồng ý với Điều khoản & Chính sách của chúng tôi.
+            <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold">
+                Dự án Quản lý Chi tiêu & AI Meal
             </p>
         </div>
     </div>
 
-    <script>
-        // Cấu hình Supabase
-        // LƯU Ý: Thay 'YOUR_SUPABASE_URL' bằng URL thực tế từ Supabase Dashboard của bạn.
-// Cấu hình Supabase - Tách biệt thông tin nhạy cảm
-// Thay vì dùng window.ENV_..., hãy dùng cú pháp của Vite/Vercel
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co'; 
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''; 
+    <script type="module">
+        // Sử dụng cú pháp chuẩn của Vite/Vercel
+        const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
+        const SUPABASE_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        async function handleLogin(provider) {
-            const buttons = document.getElementById('auth-buttons');
+        // Gán các hàm vào window để gọi được từ HTML
+        window.showEmailInput = () => {
+            document.getElementById('auth-methods').classList.add('hidden');
+            document.getElementById('email-form').classList.remove('hidden');
+            document.getElementById('error-display').classList.add('hidden');
+        };
+
+        window.hideEmailInput = () => {
+            document.getElementById('auth-methods').classList.remove('hidden');
+            document.getElementById('email-form').classList.add('hidden');
+        };
+
+        window.handleLogin = async (provider) => {
             const statusContainer = document.getElementById('status-container');
             const statusText = document.getElementById('status-text');
-            const loader = document.getElementById('loader');
             const errorDisplay = document.getElementById('error-display');
+            const emailForm = document.getElementById('email-form');
+            const authMethods = document.getElementById('auth-methods');
 
-            errorDisplay.style.display = 'none';
-            buttons.style.display = 'none';
-            statusContainer.classList.remove('hidden');
-            loader.style.display = 'block';
-            statusText.innerText = `Đang kết nối với ${provider}...`;
-
+            errorDisplay.classList.add('hidden');
+            
             try {
                 if (provider === 'facebook') {
-                    const { data, error } = await supabaseClient.auth.signInWithOAuth({
+                    authMethods.classList.add('hidden');
+                    statusContainer.classList.remove('hidden');
+                    statusText.innerText = "Đang kết nối Facebook...";
+
+                    const { error } = await supabaseClient.auth.signInWithOAuth({
                         provider: 'facebook',
-                        options: {
-                            redirectTo: window.location.origin + '/index.html'
-                        }
+                        options: { redirectTo: window.location.origin + '/index.html' }
+                    });
+                    if (error) throw error;
+
+                } else if (provider === 'email') {
+                    const email = document.getElementById('email-input').value;
+                    if (!email) throw new Error("Vui lòng nhập địa chỉ Email");
+
+                    emailForm.classList.add('hidden');
+                    statusContainer.classList.remove('hidden');
+                    statusText.innerText = "Đang gửi yêu cầu xác thực...";
+
+                    const { error } = await supabaseClient.auth.signInWithOtp({
+                        email: email,
+                        options: { emailRedirectTo: window.location.origin + '/index.html' }
                     });
                     
                     if (error) throw error;
-                } else {
-                    // Logic Magic Link yêu cầu email người dùng
-                    // Ở đây chỉ demo luồng giả định
-                    statusText.innerText = "Yêu cầu đã được gửi. Đang kiểm tra phiên làm việc...";
-                    
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 2000);
+
+                    statusContainer.innerHTML = `
+                        <div class="text-green-500 mb-2 text-2xl">📧</div>
+                        <p class="text-sm text-gray-700 font-bold">Thành công!</p>
+                        <p class="text-xs text-gray-500 text-center mt-1 px-4">Kiểm tra hộp thư đến của bạn để lấy đường dẫn đăng nhập.</p>
+                        <button onclick="location.reload()" class="mt-4 text-xs text-indigo-500 underline">Thử lại</button>
+                    `;
                 }
             } catch (error) {
-                console.error('Lỗi đăng nhập:', error.message);
-                loader.style.display = 'none';
+                console.error(error);
                 statusContainer.classList.add('hidden');
-                buttons.style.display = 'block';
-                errorDisplay.innerText = "Lỗi: " + error.message;
-                errorDisplay.style.display = 'block';
+                if (provider === 'email') emailForm.classList.remove('hidden');
+                else authMethods.classList.remove('hidden');
+                
+                errorDisplay.innerText = error.message;
+                errorDisplay.classList.remove('hidden');
             }
-        }
+        };
 
+        // Kiểm tra phiên đăng nhập hiện tại
         window.onload = async () => {
-            try {
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session) {
-                    window.location.href = 'index.html';
-                }
-            } catch (err) {
-                console.log("Không có phiên làm việc cũ.");
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                window.location.href = 'index.html';
             }
         };
     </script>
