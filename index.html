@@ -7,291 +7,242 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module">
+<script type="module">
+    // 1. Import Supabase SDK
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    // 2. Cấu hình Supabase
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const apiKeyGemini = import.meta.env?.VITE_GEMINI_API_KEY || "AIzaSy...";
+
+    // State
+    let user = null;
+    let expenses = [];
+    let goals = [];
+    let config = { salary: 0, fixedCosts: [], savings: 0, enjoyment: 0 };
+    let currentView = 'list';
+    let currentFilter = 'month';
+
+    const categories = [
+        { id: 'food', name: 'Ăn uống', icon: '🍲', color: 'bg-orange-100 text-orange-600' },
+        { id: 'transport', name: 'Di chuyển', icon: '🛵', color: 'bg-blue-100 text-blue-600' },
+        { id: 'shopping', name: 'Mua sắm', icon: '🛍️', color: 'bg-pink-100 text-pink-600' },
+        { id: 'bills', name: 'Hóa đơn', icon: '📄', color: 'bg-purple-100 text-purple-600' },
+        { id: 'other', name: 'Khác', icon: '✨', color: 'bg-slate-100 text-slate-600' }
+    ];
+
+    // --- UTILS ---
+    window.formatCurrencyInput = (i) => {
+        let v = i.value.replace(/\D/g, "");
+        i.value = v ? new Intl.NumberFormat('vi-VN').format(parseInt(v)) : "";
+    };
+    window.parseCurrency = (s) => parseInt(String(s).replace(/\D/g, "")) || 0;
+    window.formatMoney = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
+
+    // --- WINDOW FUNCTIONS (Để gọi từ HTML) ---
+    window.setView = (v) => { currentView = v; updateUI(); };
+    window.setFilter = (f) => { currentFilter = f; updateUI(); };
+    window.toggleConfigModal = (show) => {
+        const modal = document.getElementById('configModal');
+        if (modal) {
+            modal.classList.toggle('hidden', !show);
+            document.body.style.overflow = show ? 'hidden' : 'auto';
+            if (show) populateConfigFields();
+        }
+    };
+
+    // --- SUPABASE LOGIC ---
+    async function setupListeners() {
+        if (!user) return;
+
+        // 1. Tải cấu hình tài chính
+        const { data: configData } = await supabase
+            .from('user_configs')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
         
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        if (configData) {
+            config = configData;
+            document.getElementById('dashboard')?.classList.remove('hidden');
+            document.getElementById('setupPrompt')?.classList.add('hidden');
+        } else {
+            document.getElementById('setupPrompt')?.classList.remove('hidden');
+            document.getElementById('dashboard')?.classList.add('hidden');
+        }
 
-        // Firebase Config - Đảm bảo biến __firebase_config đã được định nghĩa
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        // Thay đổi dòng 26 trong file của bạn thành:
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSy...";
-        // State
-        let user = null;
-        let expenses = [];
-        let goals = [];
-        let config = { salary: 0, fixedCosts: [], savings: 0, enjoyment: 0 };
-        let currentView = 'list'; 
-        let currentFilter = 'month'; 
+        // 2. Tải chi tiêu
+        const { data: expData } = await supabase
+            .from('expenses')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+        expenses = expData || [];
 
-        // Kiểm tra trạng thái đăng nhập
-        onAuthStateChanged(auth, (u) => {
-            if (!u) {
-                window.location.href = "auth.html";
-            } else {
-                user = u;
-                setupListeners();
-            }
+        // 3. Tải mục tiêu
+        const { data: goalData } = await supabase
+            .from('goals')
+            .select('*')
+            .eq('user_id', user.id);
+        goals = goalData || [];
+
+        updateUI();
+    }
+
+    // AI Suggestion
+    window.suggestFood = async () => {
+        const btn = document.getElementById('btnSuggest');
+        const chefText = document.getElementById('aiChefText');
+        if (!btn || !apiKeyGemini) return;
+
+        btn.disabled = true;
+        btn.innerHTML = "👩‍🍳 Đang tính...";
+
+        const dailyVal = window.parseCurrency(document.getElementById('dailyVal')?.innerText || "0");
+        const note = document.getElementById('chefNote')?.value || "đa dạng";
+
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyGemini}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: `Gợi ý mâm cơm VN (Mặn, Canh, Xào) với ngân sách ${dailyVal}đ. Ghi chú: ${note}. Ngắn gọn < 40 từ.` }] }] })
+            });
+            const data = await res.json();
+            chefText.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Cá kho + Canh chua + Rau luộc.";
+        } catch (e) {
+            chefText.innerText = "Thịt kho trứng + Canh rau ngót + Đậu hũ chiên.";
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = "🍚 Gợi ý";
+        }
+    };
+
+    // --- UI UPDATES ---
+    function updateUI() {
+        const totalFixed = (config.fixedCosts || []).reduce((s, f) => s + (f.amount || 0), 0);
+        const now = new Date();
+
+        const filteredExpenses = expenses.filter(e => {
+            const d = new Date(e.created_at);
+            if (currentFilter === 'today') return d.toDateString() === now.toDateString();
+            if (currentFilter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            return true;
         });
 
-        const categories = [
-            { id: 'food', name: 'Ăn uống', icon: '🍲', color: 'bg-orange-100 text-orange-600' },
-            { id: 'transport', name: 'Di chuyển', icon: '🛵', color: 'bg-blue-100 text-blue-600' },
-            { id: 'shopping', name: 'Mua sắm', icon: '🛍️', color: 'bg-pink-100 text-pink-600' },
-            { id: 'bills', name: 'Hóa đơn', icon: '📄', color: 'bg-purple-100 text-purple-600' },
-            { id: 'other', name: 'Khác', icon: '✨', color: 'bg-slate-100 text-slate-600' }
-        ];
+        const totalSpent = filteredExpenses.reduce((s, e) => s + e.amount, 0);
+        const totalReserved = (config.savings || 0) + (config.enjoyment || 0);
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const remainingDays = lastDayOfMonth - now.getDate() + 1;
+        const remainingTotal = config.salary - (totalReserved + totalFixed + totalSpent);
+        const daily = Math.max(0, remainingTotal / remainingDays);
 
-        // Utils cho tiền tệ
-        window.formatCurrencyInput = (i) => {
-            let v = i.value.replace(/\D/g, "");
-            i.value = v ? new Intl.NumberFormat('vi-VN').format(parseInt(v)) : "";
-        };
-        window.parseCurrency = (s) => parseInt(String(s).replace(/\D/g, "")) || 0;
-        window.formatMoney = (n) => new Intl.NumberFormat('vi-VN').format(n || 0) + 'đ';
+        // Update DOM elements
+        const safeSetText = (id, text) => { if(document.getElementById(id)) document.getElementById(id).innerText = text; };
+        
+        safeSetText('dailyVal', window.formatMoney(daily));
+        safeSetText('salaryDisplay', window.formatMoney(config.salary));
+        safeSetText('savingsDisplay', window.formatMoney(config.savings));
+        safeSetText('fixedCostsDisplay', window.formatMoney(totalFixed));
+        safeSetText('filterText', currentFilter === 'today' ? 'Hôm nay' : 'Tháng này');
+        safeSetText('totalFiltered', window.formatMoney(totalSpent));
 
-        // Gắn hàm vào window để gọi từ HTML
-        window.setView = (v) => { currentView = v; updateUI(); };
-        window.setFilter = (f) => { currentFilter = f; updateUI(); };
-        window.toggleConfigModal = (show) => {
-            if (show) populateConfigFields();
-            const modal = document.getElementById('configModal');
-            if (modal) {
-                modal.classList.toggle('hidden', !show);
-                document.body.style.overflow = show ? 'hidden' : 'auto';
-            }
-        };
-
-        function setupListeners() {
-            if (!user) return;
-            // Lắng nghe cài đặt tài chính
-            onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'finance'), (snap) => {
-                if (snap.exists()) {
-                    config = snap.data();
-                    document.getElementById('dashboard')?.classList.remove('hidden');
-                    document.getElementById('setupPrompt')?.classList.add('hidden');
-                } else {
-                    document.getElementById('setupPrompt')?.classList.remove('hidden');
-                    document.getElementById('dashboard')?.classList.add('hidden');
-                }
-                updateUI();
-            });
-
-            // Lắng nghe chi tiêu
-            onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'expenses'), (snap) => {
-                expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                expenses.sort((a,b) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
-                updateUI();
-            });
-
-            // Lắng nghe mục tiêu
-            onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'goals'), (snap) => {
-                goals = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                updateUI();
-            });
+        // Tab Switch
+        if (currentView === 'stats') {
+            document.getElementById('statsView')?.classList.remove('hidden');
+            document.getElementById('listView')?.classList.add('hidden');
+            renderStats(filteredExpenses);
+        } else {
+            document.getElementById('statsView')?.classList.add('hidden');
+            document.getElementById('listView')?.classList.remove('hidden');
+            renderList(filteredExpenses);
         }
 
-        async function suggestFood() {
-            const btn = document.getElementById('btnSuggest');
-            const chefText = document.getElementById('aiChefText');
-            if (!btn || !apiKey) return;
-            
-            btn.disabled = true;
-            btn.innerHTML = "👩‍🍳 Đang tính...";
-            
-            const dailyVal = window.parseCurrency(document.getElementById('dailyVal')?.innerText || "0");
-            const note = document.getElementById('chefNote')?.value || "đa dạng";
+        updateMainChart(totalFixed, totalSpent, Math.max(0, remainingTotal), totalReserved);
+    }
 
-            try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Gợi ý mâm cơm VN (Mặn, Canh, Xào) với ngân sách ${dailyVal}đ. Ghi chú: ${note}. Ngắn gọn < 40 từ.` }] }] })
-                });
-                const data = await res.json();
-                chefText.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Cá kho + Canh chua + Rau luộc.";
-            } catch (e) {
-                chefText.innerText = "Thịt kho trứng + Canh rau ngót + Đậu hũ chiên.";
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = "🍚 Gợi ý";
-            }
-        }
-        window.suggestFood = suggestFood;
-
-        function updateUI() {
-            const totalFixed = (config.fixedCosts || []).reduce((s,f) => s+f.amount, 0);
-            const now = new Date();
-            
-            // Lọc dữ liệu theo filter (Hôm nay / Tháng này)
-            const filteredExpenses = expenses.filter(e => {
-                if (!e.date) return false;
-                const d = new Date(e.date.seconds * 1000);
-                if (currentFilter === 'today') return d.toDateString() === now.toDateString();
-                if (currentFilter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                return true;
-            });
-
-            const totalSpent = filteredExpenses.reduce((s,e) => s+e.amount, 0);
-            const totalReserved = (config.savings || 0) + (config.enjoyment || 0);
-            
-            // Tính số ngày còn lại trong tháng
-            const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-            const remainingDays = lastDayOfMonth - now.getDate() + 1;
-            
-            const remainingTotal = config.salary - (totalReserved + totalFixed + totalSpent);
-            const daily = Math.max(0, remainingTotal / remainingDays);
-
-            // Cập nhật DOM
-            const els = {
-                dailyVal: document.getElementById('dailyVal'),
-                salaryDisplay: document.getElementById('salaryDisplay'),
-                savingsDisplay: document.getElementById('savingsDisplay'),
-                fixedCostsDisplay: document.getElementById('fixedCostsDisplay'),
-                fixedList: document.getElementById('fixedDisplayList'),
-                goalList: document.getElementById('goalList'),
-                expList: document.getElementById('expenseList'),
-                statsView: document.getElementById('statsView'),
-                listView: document.getElementById('listView'),
-                btnList: document.getElementById('btnViewList'),
-                btnStats: document.getElementById('btnViewStats'),
-                filterText: document.getElementById('filterText'),
-                totalFiltered: document.getElementById('totalFiltered')
-            };
-
-            if (els.dailyVal) els.dailyVal.innerText = window.formatMoney(daily);
-            if (els.salaryDisplay) els.salaryDisplay.innerText = window.formatMoney(config.salary);
-            if (els.savingsDisplay) els.savingsDisplay.innerText = window.formatMoney(config.savings);
-            if (els.fixedCostsDisplay) els.fixedCostsDisplay.innerText = window.formatMoney(totalFixed);
-            if (els.filterText) els.filterText.innerText = currentFilter === 'today' ? 'Hôm nay' : 'Tháng này';
-            if (els.totalFiltered) els.totalFiltered.innerText = window.formatMoney(totalSpent);
-
-            // Tab Switch logic
-            if (currentView === 'stats') {
-                els.statsView.classList.remove('hidden');
-                els.listView.classList.add('hidden');
-                els.btnStats.classList.add('bg-white', 'shadow-sm');
-                els.btnList.classList.remove('bg-white', 'shadow-sm');
-                renderStats(filteredExpenses);
-            } else {
-                els.statsView.classList.add('hidden');
-                els.listView.classList.remove('hidden');
-                els.btnList.classList.add('bg-white', 'shadow-sm');
-                els.btnStats.classList.remove('bg-white', 'shadow-sm');
-                renderList(filteredExpenses);
-            }
-
-            // Fixed Costs
-            if (els.fixedList) {
-                els.fixedList.innerHTML = config.fixedCosts?.length ? '' : '<p class="text-[10px] opacity-40">Không có phí cố định.</p>';
-                config.fixedCosts?.forEach(f => {
-                    els.fixedList.innerHTML += `<div class="flex justify-between text-[10px] mb-1"><span class="truncate pr-2">${f.name}</span><span class="font-bold shrink-0">${window.formatMoney(f.amount)}</span></div>`;
-                });
-            }
-
-            // Goals
-            if (els.goalList) {
-                els.goalList.innerHTML = (goals && goals.length) ? '' : '<p class="text-xs opacity-40 italic text-center py-6">Chưa có mục tiêu.</p>';
-                (goals || []).forEach(g => {
-                    const percent = Math.min(100, (config.savings / g.target) * 100);
-                    els.goalList.innerHTML += `
-                        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mb-3">
-                            <div class="flex justify-between text-xs font-bold mb-2">
-                                <span class="truncate mr-2">${g.name}</span>
-                                <span class="${percent >= 100 ? 'text-emerald-500' : 'text-indigo-600'}">${percent.toFixed(1)}%</span>
-                            </div>
-                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                <div class="h-full transition-all duration-1000 ${percent >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}" style="width: ${percent}%"></div>
-                            </div>
-                        </div>`;
-                });
-            }
-
-            updateMainChart(totalFixed, totalSpent, Math.max(0, remainingTotal), totalReserved);
-        }
-
-        function renderList(list) {
-            const container = document.getElementById('expenseList');
-            if (!container) return;
-            container.innerHTML = list.length ? '' : '<div class="text-center py-20 opacity-30"><p class="text-4xl mb-4">📑</p><p class="text-sm font-bold">Chưa có chi tiêu nào...</p></div>';
-            list.forEach(e => {
-                const cat = categories.find(c => c.id === e.category) || categories[4];
-                container.innerHTML += `
-                    <div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-50 mb-3 hover:shadow-md transition-all active:scale-[0.98]">
-                        <div class="flex items-center gap-3">
-                            <div class="${cat.color} w-11 h-11 rounded-xl flex items-center justify-center text-xl shadow-sm shrink-0">${cat.icon}</div>
-                            <div class="min-w-0">
-                                <p class="font-bold text-sm text-slate-800 truncate">${e.name}</p>
-                                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-tight">${cat.name}</p>
-                            </div>
+    function renderList(list) {
+        const container = document.getElementById('expenseList');
+        if (!container) return;
+        container.innerHTML = list.length ? '' : '<div class="text-center py-20 opacity-30"><p class="text-sm font-bold">Chưa có chi tiêu...</p></div>';
+        list.forEach(e => {
+            const cat = categories.find(c => c.id === e.category) || categories[4];
+            container.innerHTML += `
+                <div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-50 mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="${cat.color} w-11 h-11 rounded-xl flex items-center justify-center text-xl">${cat.icon}</div>
+                        <div>
+                            <p class="font-bold text-sm text-slate-800">${e.name}</p>
+                            <p class="text-[10px] text-slate-400 uppercase font-bold">${cat.name}</p>
                         </div>
-                        <b class="text-rose-500 text-sm whitespace-nowrap ml-2">-${window.formatMoney(e.amount)}</b>
-                    </div>`;
-            });
+                    </div>
+                    <b class="text-rose-500 text-sm">-${window.formatMoney(e.amount)}</b>
+                </div>`;
+        });
+    }
+
+    function renderStats(list) {
+        const container = document.getElementById('statsView');
+        if (!container) return;
+        const grouped = {};
+        list.forEach(e => grouped[e.category] = (grouped[e.category] || 0) + e.amount);
+        
+        let html = '<div class="space-y-4">';
+        categories.forEach(cat => {
+            const amount = grouped[cat.id] || 0;
+            const total = list.reduce((s,e) => s+e.amount, 0) || 1;
+            const percent = (amount / total) * 100;
+            html += `
+                <div class="bg-white p-4 rounded-2xl border border-slate-50">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm font-bold">${cat.icon} ${cat.name}</span>
+                        <span class="text-sm font-black text-rose-500">${window.formatMoney(amount)}</span>
+                    </div>
+                    <div class="w-full bg-slate-50 h-2 rounded-full overflow-hidden">
+                        <div class="h-full bg-indigo-500" style="width: ${percent}%"></div>
+                    </div>
+                </div>`;
+        });
+        container.innerHTML = html + '</div>';
+    }
+
+    function updateMainChart(fixed, spent, remaining, reserved) {
+        const canvas = document.getElementById('mainChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+        const ctx = canvas.getContext('2d');
+        if (window.myChart) window.myChart.destroy();
+        window.myChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Cố định', 'Đã tiêu', 'Còn lại', 'Tích lũy'],
+                datasets: [{
+                    data: [fixed, spent, remaining, reserved],
+                    backgroundColor: ['#6366f1', '#f43f5e', '#10b981', '#f59e0b'],
+                    borderWidth: 0
+                }]
+            },
+            options: { cutout: '80%', plugins: { legend: { display: false } } }
+        });
+    }
+
+    // Kiểm tra Auth khi load trang
+    async function init() {
+        const { data: { session } } = await supabase.auth.getSession();
+        user = session?.user ?? null;
+        if (user) {
+            setupListeners();
+        } else {
+            // Chuyển hướng nếu chưa đăng nhập
+            // window.location.href = 'auth.html'; 
+            console.log("User chưa đăng nhập");
         }
+    }
 
-        function renderStats(list) {
-            const container = document.getElementById('statsView');
-            if (!container) return;
-            
-            // Nhóm theo danh mục
-            const grouped = {};
-            list.forEach(e => {
-                grouped[e.category] = (grouped[e.category] || 0) + e.amount;
-            });
+    init();
 
-            let html = '<div class="space-y-6">';
-            categories.forEach(cat => {
-                const amount = grouped[cat.id] || 0;
-                const total = list.reduce((s,e) => s+e.amount, 0) || 1;
-                const percent = (amount / total) * 100;
-                
-                html += `
-                    <div class="bg-white p-5 rounded-3xl border border-slate-50">
-                        <div class="flex justify-between items-center mb-3">
-                            <div class="flex items-center gap-3">
-                                <span class="text-xl">${cat.icon}</span>
-                                <span class="text-sm font-bold text-slate-700">${cat.name}</span>
-                            </div>
-                            <span class="text-sm font-black text-rose-500">${window.formatMoney(amount)}</span>
-                        </div>
-                        <div class="w-full bg-slate-50 h-2 rounded-full overflow-hidden">
-                            <div class="h-full bg-indigo-500 rounded-full" style="width: ${percent}%"></div>
-                        </div>
-                        <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">${percent.toFixed(1)}% trên tổng chi</p>
-                    </div>`;
-            });
-            html += '</div>';
-            container.innerHTML = html;
-        }
-
-        function updateMainChart(fixed, spent, remaining, reserved) {
-            const canvas = document.getElementById('mainChart');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            if (window.chart) window.chart.destroy();
-            window.chart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Cố định', 'Đã tiêu', 'Còn lại', 'Tích lũy'],
-                    datasets: [{
-                        data: [fixed, spent, remaining, reserved],
-                        backgroundColor: ['#6366f1', '#f43f5e', '#10b981', '#f59e0b'],
-                        borderWidth: 0,
-                        hoverOffset: 15
-                    }]
-                },
-                options: { 
-                    cutout: '82%', 
-                    plugins: { legend: { display: false } },
-                    animation: { animateRotate: true, duration: 1200 }
-                }
-            });
-        }
-
+</script>
 
     </script>
     <style>
