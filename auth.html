@@ -123,11 +123,10 @@
         // Cấu hình Supabase
         // LƯU Ý: Thay 'YOUR_SUPABASE_URL' bằng URL thực tế từ Supabase Dashboard của bạn.
 // Cấu hình Supabase - Tách biệt thông tin nhạy cảm
-// Sử dụng toán tử logic để ưu tiên lấy từ biến môi trường của nền tảng (nếu có)
-const SUPABASE_URL = window.ENV_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co'; 
-const SUPABASE_KEY = window.ENV_SUPABASE_KEY || ''; // Để trống để điền trên Vercel
+// Thay vì dùng window.ENV_..., hãy dùng cú pháp của Vite/Vercel
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co'; 
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''; 
 
-// Khởi tạo client
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         async function handleLogin(provider) {
