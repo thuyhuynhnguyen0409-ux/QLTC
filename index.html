@@ -78,12 +78,14 @@
         window.removeFixedCostRow = (btn) => btn.closest('.fixed-cost-row').remove();
 
         // Auth
+        // Tìm hàm này và sửa lại
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    await signInAnonymously(auth);
+                    // await signInAnonymously(auth); // <--- XÓA DÒNG NÀY ĐỂ KHÔNG TỰ ĐĂNG NHẬP ẨN DANH
+                    console.log("Waiting for user to log in via auth.html...");
                 }
             } catch (error) {
                 console.error("Auth error:", error);
