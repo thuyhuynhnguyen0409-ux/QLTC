@@ -32,7 +32,11 @@
         { id: 'bills', name: 'Hóa đơn', icon: '📄', color: 'bg-purple-100 text-purple-600' },
         { id: 'other', name: 'Khác', icon: '✨', color: 'bg-slate-100 text-slate-600' }
     ];
-
+function populateConfigFields() {
+    const salaryInput = document.getElementById('salaryInput');
+    if (salaryInput) salaryInput.value = window.formatMoney(config.salary);
+    // Điền thêm các trường khác như tiết kiệm, chi phí cố định...
+}
     // --- UTILS ---
     window.formatCurrencyInput = (i) => {
         let v = i.value.replace(/\D/g, "");
