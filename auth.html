@@ -194,7 +194,8 @@
                         <div class="text-green-500 mb-2 text-2xl">📧</div>
                         <p class="text-sm text-gray-700 font-bold">Thành công!</p>
                         <p class="text-xs text-gray-500 text-center mt-1 px-4">Kiểm tra hộp thư đến của bạn để lấy đường dẫn đăng nhập.</p>
-                        <button onclick="location.reload()" class="mt-4 text-xs text-indigo-500 underline">Thử lại</button>
+                        <p class="text-xs text-gray-500 text-center mt-1 px-4">Sau khi click link, bạn sẽ được đưa về trang chủ.</p>
+                        <button onclick="location.reload()" class="mt-4 text-xs text-indigo-500 underline">Trở lại</button>
                     `;
                 }
             } catch (error) {
@@ -203,18 +204,29 @@
                 if (provider === 'email') emailForm.classList.remove('hidden');
                 else authMethods.classList.remove('hidden');
                 
-                errorDisplay.innerText = error.message;
+                errorDisplay.innerText = error?.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.';
                 errorDisplay.classList.remove('hidden');
             }
         };
 
-        // Kiểm tra phiên đăng nhập hiện tại
-        window.onload = async () => {
+        async function redirectIfSignedIn() {
             if (!supabaseClient) return;
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) {
+            if (session?.user) {
                 window.location.href = '/index.html';
             }
+        }
+
+        // Kiểm tra phiên đăng nhập hiện tại
+        window.onload = async () => {
+            await redirectIfSignedIn();
+
+            if (!supabaseClient) return;
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (session?.user) {
+                    window.location.href = '/index.html';
+                }
+            });
         };
     </script>
 </body>
