@@ -35,11 +35,6 @@
         return null;
     };
 
-    let goals = [];
-    let config = { salary: 0, fixedCosts: [], savings: 0, enjoyment: 0 };
-    let currentView = 'list';
-    let currentFilter = 'month';
-
     const categories = [
         { id: 'food', name: 'Ăn uống', icon: '🍲', color: 'bg-orange-100 text-orange-600' },
         { id: 'transport', name: 'Di chuyển', icon: '🛵', color: 'bg-blue-100 text-blue-600' },
@@ -48,9 +43,30 @@
         { id: 'other', name: 'Khác', icon: '✨', color: 'bg-slate-100 text-slate-600' }
     ];
 function populateConfigFields() {
-    const salaryInput = document.getElementById('salaryInput');
-    if (salaryInput) salaryInput.value = window.formatMoney(config.salary);
-    // Điền thêm các trường khác như tiết kiệm, chi phí cố định...
+    document.getElementById('salaryInput').value =
+        config.salary
+            ? new Intl.NumberFormat('vi-VN').format(config.salary)
+            : '';
+
+    document.getElementById('savingsInput').value =
+        config.savings
+            ? new Intl.NumberFormat('vi-VN').format(config.savings)
+            : '';
+
+    document.getElementById('enjoymentInput').value =
+        config.enjoyment
+            ? new Intl.NumberFormat('vi-VN').format(config.enjoyment)
+            : '';
+
+    const fixedContainer = document.getElementById('fixedCostsList');
+    fixedContainer.innerHTML = '';
+
+    (config.fixedCosts || []).forEach(item => {
+        window.addFixedCostRow(
+            item.name,
+            item.amount
+        );
+    });
 }
     // --- UTILS ---
     window.formatCurrencyInput = (i) => {
@@ -72,22 +88,175 @@ function populateConfigFields() {
         }
     };
 
+    window.addExpense = async () => {
+        if (!user) return;
+
+        const name = document.getElementById('expName').value.trim();
+        const amount = window.parseCurrency(document.getElementById('expAmount').value);
+        const category = document.getElementById('expCategory').value;
+
+        if (!name || !amount) {
+            alert('Nhập đầy đủ thông tin');
+            return;
+        }
+
+        const { error } = await supabase
+            .from('expenses')
+            .insert({
+                user_id: user.id,
+                name,
+                amount,
+                category
+            });
+
+        if (error) {
+            console.error(error);
+            alert('Lỗi thêm chi tiêu');
+            return;
+        }
+
+        document.getElementById('expName').value = '';
+        document.getElementById('expAmount').value = '';
+
+        setupListeners();
+    };
+
+    window.addGoal = async () => {
+        const name = document.getElementById('goalName').value.trim();
+        const target = window.parseCurrency(document.getElementById('goalTarget').value);
+
+        if (!name || !target) {
+            alert('Nhập mục tiêu');
+            return;
+        }
+
+        const { error } = await supabase
+            .from('goals')
+            .insert({
+                user_id: user.id,
+                name,
+                target,
+                saved: 0
+            });
+
+        if (error) {
+            console.error(error);
+            return;
+        }
+
+        document.getElementById('goalName').value = '';
+        document.getElementById('goalTarget').value = '';
+
+        setupListeners();
+    };
+
+    window.initBudget = async () => {
+        const salary = window.parseCurrency(
+            document.getElementById('salaryInput').value
+        );
+
+        const savings = window.parseCurrency(
+            document.getElementById('savingsInput').value
+        );
+
+        const enjoyment = window.parseCurrency(
+            document.getElementById('enjoymentInput').value
+        );
+
+        const fixedCosts = [];
+
+        document.querySelectorAll('.fixed-cost-row').forEach(row => {
+            const name = row.querySelector('.fixed-name').value;
+            const amount = window.parseCurrency(
+                row.querySelector('.fixed-amount').value
+            );
+
+            if (name && amount) {
+                fixedCosts.push({ name, amount });
+            }
+        });
+
+        const newConfig = {
+            salary,
+            savings,
+            enjoyment,
+            fixedCosts
+        };
+
+        const { error } = await supabase
+            .from('settings')
+            .upsert({
+                user_id: user.id,
+                config: newConfig,
+                updated_at: new Date()
+            });
+
+        if (error) {
+            console.error(error);
+            alert('Lỗi lưu cấu hình');
+            return;
+        }
+
+        config = newConfig;
+
+        window.toggleConfigModal(false);
+
+        setupListeners();
+    };
+
+    window.addFixedCostRow = (name = '', amount = '') => {
+        const container = document.getElementById('fixedCostsList');
+
+        const div = document.createElement('div');
+        div.className = 'fixed-cost-row flex gap-2 mb-3';
+
+        div.innerHTML = `
+            <input
+                type="text"
+                class="fixed-name flex-1 p-3 bg-slate-50 rounded-xl"
+                placeholder="Tên phí"
+                value="${name}"
+            >
+
+            <input
+                type="text"
+                class="fixed-amount w-32 p-3 bg-slate-50 rounded-xl"
+                placeholder="0"
+                value="${amount}"
+                oninput="window.formatCurrencyInput(this)"
+            >
+        `;
+
+        container.appendChild(div);
+    };
+
     // --- SUPABASE LOGIC ---
     async function setupListeners() {
         if (!user) return;
 
         // 1. Tải cấu hình tài chính
         const { data: configData } = await supabase
-            .from('user_configs')
+            .from('settings')
             .select('*')
             .eq('user_id', user.id)
             .single();
         
         if (configData) {
-            config = configData;
+            config = configData?.config || {
+                salary: 0,
+                fixedCosts: [],
+                savings: 0,
+                enjoyment: 0
+            };
             document.getElementById('dashboard')?.classList.remove('hidden');
             document.getElementById('setupPrompt')?.classList.add('hidden');
         } else {
+            config = {
+                salary: 0,
+                fixedCosts: [],
+                savings: 0,
+                enjoyment: 0
+            };
             document.getElementById('setupPrompt')?.classList.remove('hidden');
             document.getElementById('dashboard')?.classList.add('hidden');
         }
@@ -180,6 +349,7 @@ function populateConfigFields() {
         }
 
         updateMainChart(totalFixed, totalSpent, Math.max(0, remainingTotal), totalReserved);
+        renderGoals();
     }
 
     function renderList(list) {
@@ -225,6 +395,50 @@ function populateConfigFields() {
                 </div>`;
         });
         container.innerHTML = html + '</div>';
+    }
+
+    function renderGoals() {
+        const container = document.getElementById('goalList');
+
+        if (!container) return;
+
+        if (!goals.length) {
+            container.innerHTML = `
+                <div class="text-sm text-slate-400">
+                    Chưa có mục tiêu
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = goals.map(goal => {
+            const percent = Math.min(
+                100,
+                ((goal.saved || 0) / goal.target) * 100
+            );
+
+            return `
+                <div class="bg-slate-50 p-5 rounded-2xl">
+                    <div class="flex justify-between mb-2">
+                        <b>${goal.name}</b>
+                        <span>${percent.toFixed(0)}%</span>
+                    </div>
+
+                    <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                            class="h-full bg-indigo-500"
+                            style="width:${percent}%"
+                        ></div>
+                    </div>
+
+                    <div class="mt-2 text-sm text-slate-500">
+                        ${window.formatMoney(goal.saved || 0)}
+                        /
+                        ${window.formatMoney(goal.target)}
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     function updateMainChart(fixed, spent, remaining, reserved) {
