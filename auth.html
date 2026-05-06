@@ -209,6 +209,28 @@
             }
         };
 
+        const parseHashToken = () => {
+            const hash = window.location.hash.replace(/^#/, '');
+            if (!hash) return null;
+            const params = new URLSearchParams(hash);
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
+            if (!access_token || !refresh_token) return null;
+            return { access_token, refresh_token };
+        };
+
+        const restoreSessionFromHash = async () => {
+            const tokens = parseHashToken();
+            if (!tokens || !supabaseClient || typeof supabaseClient.auth.setSession !== 'function') return null;
+            const { data, error } = await supabaseClient.auth.setSession(tokens);
+            if (error) {
+                console.warn('Không thể phục hồi session từ callback hash trên auth.html:', error.message);
+                return null;
+            }
+            window.history.replaceState(null, '', window.location.pathname);
+            return data.session?.user ?? null;
+        };
+
         async function redirectIfSignedIn() {
             if (!supabaseClient) return;
             console.log('auth.html load URL=', window.location.href);
@@ -225,6 +247,14 @@
         window.onload = async () => {
             try {
                 await redirectIfSignedIn();
+                if (supabaseClient) {
+                    const restoredUser = await restoreSessionFromHash();
+                    if (restoredUser) {
+                        console.log('auth.html restored session from hash:', restoredUser);
+                        window.location.href = window.location.origin + '/index.html';
+                        return;
+                    }
+                }
             } catch (error) {
                 console.error('Lỗi khi kiểm tra session trên auth.html:', error);
             }

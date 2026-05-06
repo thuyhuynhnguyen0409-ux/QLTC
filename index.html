@@ -24,22 +24,34 @@
         }
         return null;
     };
-    const handleSupabaseCallback = async () => {
-        try {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) {
-                console.warn('Không thể lấy session Supabase:', error.message);
-                return null;
-            }
-            if (session?.user) {
-                window.history.replaceState(null, '', window.location.pathname);
-                return session.user;
-            }
-        } catch (error) {
-            console.error('Lỗi khi kiểm tra session Supabase:', error);
+    const parseHashToken = () => {
+        const hash = window.location.hash.replace(/^#/, '');
+        if (!hash) return null;
+        const params = new URLSearchParams(hash);
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+        if (!access_token || !refresh_token) return null;
+        return { access_token, refresh_token };
+    };
+    const restoreSessionFromHash = async () => {
+        const tokens = parseHashToken();
+        if (!tokens) return null;
+        if (!supabase || typeof supabase.auth.setSession !== 'function') {
+            console.warn('Supabase client không hỗ trợ setSession() hoặc chưa khởi tạo.');
             return null;
         }
-        return null;
+        try {
+            const { data, error } = await supabase.auth.setSession(tokens);
+            if (error) {
+                console.warn('Không thể phục hồi session từ callback hash:', error.message);
+                return null;
+            }
+            window.history.replaceState(null, '', window.location.pathname);
+            return data.session?.user ?? null;
+        } catch (error) {
+            console.error('Lỗi khi phục hồi session Supabase:', error);
+            return null;
+        }
     };
     
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -309,12 +321,14 @@ function populateConfigFields() {
                     alert(`Đăng nhập OAuth lỗi: ${oauthError}\n${oauthDesc || ''}`);
                 }
 
-                user = await handleSupabaseCallback();
-                console.log('index.html session after callback=', user);
-            }
-            if (!user) {
-                user = await waitForSession(8000);
-                console.log('index.html session after waiting=', user);
+                const restoredUser = await restoreSessionFromHash();
+                if (restoredUser) {
+                    user = restoredUser;
+                    console.log('index.html session restored from hash=', user);
+                } else {
+                    user = await waitForSession(8000);
+                    console.log('index.html session after waiting=', user);
+                }
             }
         } catch (error) {
             console.error('Lỗi khi kiểm tra session Supabase:', error);
