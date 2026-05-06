@@ -14,6 +14,16 @@
     const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
     const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || '';
     const apiKeyGemini = env.VITE_GEMINI_API_KEY || '';
+
+    const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+    let user = null;
+    let expenses = [];
+    let goals = [];
+    let config = { salary: 0, fixedCosts: [], savings: 0, enjoyment: 0 };
+    let currentView = 'list';
+    let currentFilter = 'month';
+
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
     const waitForSession = async (timeoutMs = 8000) => {
         const startedAt = Date.now();
@@ -24,45 +34,7 @@
         }
         return null;
     };
-    const parseHashToken = () => {
-        const hash = window.location.hash.replace(/^#/, '');
-        if (!hash) return null;
-        const params = new URLSearchParams(hash);
-        const access_token = params.get('access_token');
-        const refresh_token = params.get('refresh_token');
-        if (!access_token || !refresh_token) return null;
-        return { access_token, refresh_token };
-    };
-    const restoreSessionFromHash = async () => {
-        const tokens = parseHashToken();
-        if (!tokens) return null;
-        if (!supabase || typeof supabase.auth.setSession !== 'function') {
-            console.warn('Supabase client không hỗ trợ setSession() hoặc chưa khởi tạo.');
-            return null;
-        }
-        try {
-            const { data, error } = await supabase.auth.setSession(tokens);
-            if (error) {
-                console.warn('Không thể phục hồi session từ callback hash:', error.message);
-                return null;
-            }
-            window.history.replaceState(null, '', window.location.pathname);
-            return data.session?.user ?? null;
-        } catch (error) {
-            console.error('Lỗi khi phục hồi session Supabase:', error);
-            return null;
-        }
-    };
-    
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        console.error("Thiếu Supabase ENV. Vui lòng cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.");
-    }
-    
-    const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null
 
-    // State
-    let user = null;
-    let expenses = [];
     let goals = [];
     let config = { salary: 0, fixedCosts: [], savings: 0, enjoyment: 0 };
     let currentView = 'list';
@@ -321,14 +293,8 @@ function populateConfigFields() {
                     alert(`Đăng nhập OAuth lỗi: ${oauthError}\n${oauthDesc || ''}`);
                 }
 
-                const restoredUser = await restoreSessionFromHash();
-                if (restoredUser) {
-                    user = restoredUser;
-                    console.log('index.html session restored from hash=', user);
-                } else {
-                    user = await waitForSession(8000);
-                    console.log('index.html session after waiting=', user);
-                }
+                user = await waitForSession(8000);
+                console.log('index.html session after waiting=', user);
             }
         } catch (error) {
             console.error('Lỗi khi kiểm tra session Supabase:', error);
