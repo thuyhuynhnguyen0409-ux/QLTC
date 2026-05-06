@@ -212,7 +212,22 @@
         async function redirectIfSignedIn() {
             if (!supabaseClient) return;
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session?.user) {
+            let userSession = session;
+
+            const hash = window.location.hash || '';
+            const hasAuthToken = hash.includes('access_token') || window.location.href.includes('access_token');
+            if (!userSession && hasAuthToken) {
+                const { data: { session: urlSession }, error } = await supabaseClient.auth.getSessionFromUrl();
+                if (error) {
+                    console.error('Lỗi khi lấy session từ URL:', error.message);
+                }
+                userSession = urlSession;
+                if (userSession) {
+                    window.location.hash = '';
+                }
+            }
+
+            if (userSession?.user) {
                 window.location.href = '/index.html';
             }
         }

@@ -268,12 +268,17 @@ function populateConfigFields() {
         const { data: { session } } = await supabase.auth.getSession();
         user = session?.user ?? null;
 
-        if (!user && window.location.href.includes('access_token')) {
+        const hash = window.location.hash || '';
+        const hasAuthToken = hash.includes('access_token') || window.location.href.includes('access_token');
+        if (!user && hasAuthToken) {
             const { data: { session: urlSession }, error } = await supabase.auth.getSessionFromUrl();
             if (error) {
                 console.error('Lỗi khi lấy session từ URL:', error.message);
             }
             user = urlSession?.user ?? null;
+            if (user) {
+                window.location.hash = '';
+            }
         }
 
         if (user) {
