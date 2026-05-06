@@ -267,6 +267,15 @@ function populateConfigFields() {
 
         const { data: { session } } = await supabase.auth.getSession();
         user = session?.user ?? null;
+
+        if (!user && window.location.href.includes('access_token')) {
+            const { data: { session: urlSession }, error } = await supabase.auth.getSessionFromUrl();
+            if (error) {
+                console.error('Lỗi khi lấy session từ URL:', error.message);
+            }
+            user = urlSession?.user ?? null;
+        }
+
         if (user) {
             setupListeners();
         } else {
