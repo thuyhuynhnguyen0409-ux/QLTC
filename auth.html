@@ -123,6 +123,7 @@
         const SUPABASE_KEY = env.VITE_SUPABASE_ANON_KEY || '';
         
         let supabaseClient = null;
+
         if (SUPABASE_URL && SUPABASE_KEY) {
             supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         } else {
@@ -187,7 +188,6 @@
                         email: email,
                         options: { emailRedirectTo: window.location.origin + '/index.html' }
                     });
-                    
                     if (error) throw error;
 
                     statusContainer.innerHTML = `
@@ -211,35 +211,46 @@
 
         async function redirectIfSignedIn() {
             if (!supabaseClient) return;
+            console.log('auth.html load URL=', window.location.href);
             const { data: { session } } = await supabaseClient.auth.getSession();
+            console.log('auth.html current session=', session);
             let userSession = session;
 
             const hash = window.location.hash || '';
-            const hasAuthToken = hash.includes('access_token') || window.location.href.includes('access_token');
+            const search = window.location.search || '';
+            const hasAuthToken = hash.includes('access_token') || search.includes('access_token') || window.location.href.includes('access_token');
             if (!userSession && hasAuthToken) {
-                const { data: { session: urlSession }, error } = await supabaseClient.auth.getSessionFromUrl();
+                const { data: { session: urlSession }, error } = await supabaseClient.auth.getSessionFromUrl({ storeSession: true });
                 if (error) {
                     console.error('Lỗi khi lấy session từ URL:', error.message);
                 }
+                console.log('auth.html getSessionFromUrl result=', urlSession);
                 userSession = urlSession;
                 if (userSession) {
-                    window.location.hash = '';
+                    window.history.replaceState(null, '', window.location.pathname);
+                } else {
+                    console.warn('getSessionFromUrl không trả về userSession mặc dù có access_token');
                 }
             }
 
             if (userSession?.user) {
-                window.location.href = '/index.html';
+                console.log('auth.html redirecting to index.html');
+                window.location.href = window.location.origin + '/index.html';
             }
         }
 
         // Kiểm tra phiên đăng nhập hiện tại
         window.onload = async () => {
-            await redirectIfSignedIn();
+            try {
+                await redirectIfSignedIn();
+            } catch (error) {
+                console.error('Lỗi khi kiểm tra session trên auth.html:', error);
+            }
 
             if (!supabaseClient) return;
             supabaseClient.auth.onAuthStateChange((event, session) => {
                 if (session?.user) {
-                    window.location.href = '/index.html';
+                    window.location.href = window.location.origin + '/index.html';
                 }
             });
         };

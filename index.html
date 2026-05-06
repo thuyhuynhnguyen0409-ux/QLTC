@@ -14,6 +14,38 @@
     const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
     const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || '';
     const apiKeyGemini = env.VITE_GEMINI_API_KEY || '';
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const waitForSession = async (timeoutMs = 8000) => {
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < timeoutMs) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) return session.user;
+            await sleep(300);
+        }
+        return null;
+    };
+    const handleSupabaseCallback = async () => {
+        try {
+            const { data: { session }, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+            if (error) {
+                console.warn('Không tìm thấy session từ URL hoặc callback chưa có token:', error.message);
+                return null;
+            }
+            if (session?.user) {
+                window.history.replaceState(null, '', window.location.pathname);
+                return session.user;
+            }
+        } catch (error) {
+            console.error('Lỗi khi gọi getSessionFromUrl:', error);
+            return null;
+        }
+
+        const delayedSession = await waitForSession(8000);
+        if (delayedSession) {
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+        return delayedSession;
+    };
     
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
         console.error("Thiếu Supabase ENV. Vui lòng cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.");
@@ -255,36 +287,40 @@ function populateConfigFields() {
         }
 
         supabase.auth.onAuthStateChange((event, session) => {
-            if (!session) {
-                window.location.href = 'auth.html';
+            if (session?.user) {
+                if (!user) {
+                    user = session.user;
+                    setupListeners();
+                }
                 return;
             }
-            if (!user) {
-                user = session.user;
-                setupListeners();
+            if (event === 'SIGNED_OUT') {
+                window.location.href = 'auth.html';
             }
         });
 
-        const { data: { session } } = await supabase.auth.getSession();
-        user = session?.user ?? null;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            user = session?.user ?? null;
+            console.log('index.html current URL=', window.location.href);
+            console.log('index.html current session=', session);
 
-        const hash = window.location.hash || '';
-        const hasAuthToken = hash.includes('access_token') || window.location.href.includes('access_token');
-        if (!user && hasAuthToken) {
-            const { data: { session: urlSession }, error } = await supabase.auth.getSessionFromUrl();
-            if (error) {
-                console.error('Lỗi khi lấy session từ URL:', error.message);
+            if (!user) {
+                user = await handleSupabaseCallback();
+                console.log('index.html session after callback=', user);
             }
-            user = urlSession?.user ?? null;
-            if (user) {
-                window.location.hash = '';
+            if (!user) {
+                user = await waitForSession(8000);
+                console.log('index.html session after waiting=', user);
             }
+        } catch (error) {
+            console.error('Lỗi khi kiểm tra session Supabase:', error);
         }
 
         if (user) {
             setupListeners();
         } else {
-            window.location.href = 'auth.html'; 
+            window.location.href = 'auth.html';
             console.log("User chưa đăng nhập");
         }
     }
