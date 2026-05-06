@@ -6,22 +6,20 @@
     <title>Finance Master AI - Home Chef Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/env.js"></script>
     <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
     
-    const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
-    const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
-    const apiKeyGemini = import.meta.env?.VITE_GEMINI_API_KEY || '';
+    const env = window.ENV || {};
+    const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
+    const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || '';
+    const apiKeyGemini = env.VITE_GEMINI_API_KEY || '';
     
-    // Check ENV
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        console.error("Thiếu Supabase ENV");
+        console.error("Thiếu Supabase ENV. Vui lòng cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.");
     }
     
-    const supabase = createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-    );
+    const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null
 
     // State
     let user = null;
@@ -238,12 +236,18 @@ function populateConfigFields() {
 
     // Kiểm tra Auth khi load trang
     async function init() {
+        if (!supabase) {
+            document.getElementById('dashboard')?.classList.add('hidden');
+            document.getElementById('setupPrompt')?.classList.remove('hidden');
+            console.error('Supabase client không thể khởi tạo vì thiếu biến môi trường.');
+            return;
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         user = session?.user ?? null;
         if (user) {
             setupListeners();
         } else {
-            // Chuyển hướng nếu chưa đăng nhập
             window.location.href = 'auth.html'; 
             console.log("User chưa đăng nhập");
         }
