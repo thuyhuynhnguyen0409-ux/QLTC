@@ -96,6 +96,7 @@ function populateConfigFields() {
             .eq('user_id', user.id);
         goals = goalData || [];
 
+        updateUserDisplay();
         updateUI();
     }
 
@@ -235,6 +236,16 @@ function populateConfigFields() {
     }
 
     // Kiểm tra Auth khi load trang
+    function updateUserDisplay() {
+        const display = document.getElementById('userEmailDisplay');
+        if (!display) return;
+        if (user && user.email) {
+            display.innerText = `Xin chào, ${user.email}`;
+        } else {
+            display.innerText = '';
+        }
+    }
+
     async function init() {
         if (!supabase) {
             document.getElementById('dashboard')?.classList.add('hidden');
@@ -242,6 +253,17 @@ function populateConfigFields() {
             console.error('Supabase client không thể khởi tạo vì thiếu biến môi trường.');
             return;
         }
+
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (!session) {
+                window.location.href = 'auth.html';
+                return;
+            }
+            if (!user) {
+                user = session.user;
+                setupListeners();
+            }
+        });
 
         const { data: { session } } = await supabase.auth.getSession();
         user = session?.user ?? null;
@@ -267,6 +289,7 @@ function populateConfigFields() {
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
                 <h1 class="text-3xl font-extrabold tracking-tight">Finance <span class="text-indigo-600">AI</span></h1>
+                <p id="userEmailDisplay" class="text-slate-500 text-sm mt-2"></p>
                 <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Quản lý & Đầu bếp gia đình</p>
             </div>
             <button onclick="window.toggleConfigModal(true)" class="bg-white border-2 border-slate-100 px-6 py-3 rounded-2xl font-bold text-sm shadow-sm hover:border-indigo-100 transition-all active:scale-95">
