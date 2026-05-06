@@ -26,9 +26,9 @@
     };
     const handleSupabaseCallback = async () => {
         try {
-            const { data: { session }, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+            const { data: { session }, error } = await supabase.auth.getSession();
             if (error) {
-                console.warn('Không tìm thấy session từ URL hoặc callback chưa có token:', error.message);
+                console.warn('Không thể lấy session Supabase:', error.message);
                 return null;
             }
             if (session?.user) {
@@ -36,15 +36,10 @@
                 return session.user;
             }
         } catch (error) {
-            console.error('Lỗi khi gọi getSessionFromUrl:', error);
+            console.error('Lỗi khi kiểm tra session Supabase:', error);
             return null;
         }
-
-        const delayedSession = await waitForSession(8000);
-        if (delayedSession) {
-            window.history.replaceState(null, '', window.location.pathname);
-        }
-        return delayedSession;
+        return null;
     };
     
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -306,6 +301,14 @@ function populateConfigFields() {
             console.log('index.html current session=', session);
 
             if (!user) {
+                const params = new URLSearchParams(window.location.search);
+                const oauthError = params.get('error');
+                const oauthDesc = params.get('error_description');
+                if (oauthError) {
+                    console.warn('OAuth callback error:', oauthError, oauthDesc);
+                    alert(`Đăng nhập OAuth lỗi: ${oauthError}\n${oauthDesc || ''}`);
+                }
+
                 user = await handleSupabaseCallback();
                 console.log('index.html session after callback=', user);
             }

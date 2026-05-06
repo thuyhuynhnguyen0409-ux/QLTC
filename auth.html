@@ -212,28 +212,10 @@
         async function redirectIfSignedIn() {
             if (!supabaseClient) return;
             console.log('auth.html load URL=', window.location.href);
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            console.log('auth.html current session=', session);
-            let userSession = session;
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            console.log('auth.html current session=', session, error);
 
-            const hash = window.location.hash || '';
-            const search = window.location.search || '';
-            const hasAuthToken = hash.includes('access_token') || search.includes('access_token') || window.location.href.includes('access_token');
-            if (!userSession && hasAuthToken) {
-                const { data: { session: urlSession }, error } = await supabaseClient.auth.getSessionFromUrl({ storeSession: true });
-                if (error) {
-                    console.error('Lỗi khi lấy session từ URL:', error.message);
-                }
-                console.log('auth.html getSessionFromUrl result=', urlSession);
-                userSession = urlSession;
-                if (userSession) {
-                    window.history.replaceState(null, '', window.location.pathname);
-                } else {
-                    console.warn('getSessionFromUrl không trả về userSession mặc dù có access_token');
-                }
-            }
-
-            if (userSession?.user) {
+            if (session?.user) {
                 console.log('auth.html redirecting to index.html');
                 window.location.href = window.location.origin + '/index.html';
             }
