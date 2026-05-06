@@ -7,17 +7,22 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module">
-    // 1. Import Supabase SDK
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
-
-// Thay thế đoạn cấu hình cũ:
-const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
-
-// Đảm bảo URL bắt đầu bằng http/https
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    const apiKeyGemini = import.meta.env?.VITE_GEMINI_API_KEY || "AIzaSy...";
+    
+    // ENV
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const apiKeyGemini = import.meta.env.VITE_GEMINI_API_KEY;
+    
+    // Check ENV
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        console.error("Thiếu Supabase ENV");
+    }
+    
+    const supabase = createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+    );
 
     // State
     let user = null;
