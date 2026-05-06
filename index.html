@@ -9,9 +9,9 @@
     <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
     
-    const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'your_default_url';
-    const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'your_default_key';
-    const apiKeyGemini = import.meta.env?.VITE_GEMINI_API_KEY || 'your_default_gemini_key';
+    const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
+    const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+    const apiKeyGemini = import.meta.env?.VITE_GEMINI_API_KEY || '';
     
     // Check ENV
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
