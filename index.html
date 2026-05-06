@@ -10,10 +10,12 @@
     // 1. Import Supabase SDK
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-    // 2. Cấu hình Supabase
-    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Thay thế đoạn cấu hình cũ:
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
+
+// Đảm bảo URL bắt đầu bằng http/https
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const apiKeyGemini = import.meta.env?.VITE_GEMINI_API_KEY || "AIzaSy...";
 
