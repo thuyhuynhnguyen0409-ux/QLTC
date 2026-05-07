@@ -288,31 +288,80 @@ function populateConfigFields() {
 
     // AI Suggestion
     window.suggestFood = async () => {
-        const btn = document.getElementById('btnSuggest');
-        const chefText = document.getElementById('aiChefText');
-        if (!btn || !apiKeyGemini) return;
+    const btn = document.getElementById('btnSuggest');
+    const chefText = document.getElementById('aiChefText');
 
-        btn.disabled = true;
-        btn.innerHTML = "👩‍🍳 Đang tính...";
+    if (!btn) return;
 
-        const dailyVal = window.parseCurrency(document.getElementById('dailyVal')?.innerText || "0");
-        const note = document.getElementById('chefNote')?.value || "đa dạng";
+    if (!apiKeyGemini) {
+        alert('Thiếu Gemini API Key');
+        return;
+    }
 
-        try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyGemini}`, {
+    btn.disabled = true;
+    btn.innerHTML = "👩‍🍳 Đang tính...";
+
+    const dailyVal =
+        window.parseCurrency(
+            document.getElementById('dailyVal')?.innerText || "0"
+        );
+
+    const note =
+        document.getElementById('chefNote')?.value ||
+        "đa dạng";
+
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKeyGemini}`,
+            {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: `Gợi ý mâm cơm VN (Mặn, Canh, Xào) với ngân sách ${dailyVal}đ. Ghi chú: ${note}. Ngắn gọn < 40 từ.` }] }] })
-            });
-            const data = await res.json();
-            chefText.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Cá kho + Canh chua + Rau luộc.";
-        } catch (e) {
-            chefText.innerText = "Thịt kho trứng + Canh rau ngót + Đậu hũ chiên.";
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = "🍚 Gợi ý";
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text:
+`Gợi ý 1 mâm cơm Việt Nam gồm:
+- món mặn
+- món canh
+- món rau/xào
+
+Ngân sách: ${dailyVal} VNĐ
+Yêu cầu: ${note}
+Giá cả nguyên liệu chính xác theo giá mới nhất thị trường.
+Hướng dẫn cách làm món ăn ngắn gọn
+Trả lời ngắn gọn.`
+                        }]
+                    }]
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        console.log(data);
+
+        if (data.error) {
+            chefText.innerText =
+                "Gemini API lỗi: " +
+                data.error.message;
+        } else {
+            chefText.innerText =
+                data.candidates?.[0]?.content?.parts?.[0]?.text ||
+                "Không nhận được phản hồi AI";
         }
-    };
+
+    } catch (err) {
+        console.error(err);
+
+        chefText.innerText =
+            "Không thể kết nối Gemini API";
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = "🍚 Gợi ý";
+    }
+};
 
     // --- UI UPDATES ---
     function updateUI() {
