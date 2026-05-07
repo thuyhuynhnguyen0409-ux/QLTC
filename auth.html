@@ -123,7 +123,13 @@
         const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
         const SUPABASE_KEY = env.VITE_SUPABASE_ANON_KEY || '';
         
-        const supabaseClient = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+        const supabaseClient = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: {
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true
+            }
+        }) : null;
 
         if (!supabaseClient) {
             console.error('Thiếu Supabase ENV. Vui lòng cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.');
@@ -171,7 +177,7 @@
 
                     const { error } = await supabaseClient.auth.signInWithOAuth({
                         provider: provider,
-                        options: { redirectTo: window.location.origin + '/' }
+                        options: { redirectTo: window.location.origin + '/index.html' }
                     });
                     if (error) throw error;
 
@@ -185,7 +191,7 @@
 
                     const { error } = await supabaseClient.auth.signInWithOtp({
                         email: email,
-                        options: { emailRedirectTo: window.location.origin + '/' }
+                        options: { emailRedirectTo: window.location.origin + '/index.html' }
                     });
                     if (error) throw error;
 
