@@ -531,23 +531,14 @@ function populateConfigFields() {
         } else {
             console.log('Không tìm thấy session');
             
-            // Delay để Supabase restore session
-            setTimeout(async () => {
-                const {
-                    data: { session }
-                } = await supabase.auth.getSession();
-
-                if (session?.user) {
-                    user = session.user;
-                    console.log(
-                        'Session restored sau delay:',
-                        user.email
-                    );
-                    await setupListeners();
-                } else {
-                    redirectToLogin();
-                }
-            }, 2000);
+            // Chờ Supabase restore session từ URL hash
+            user = await waitForSession(8000);
+            if (user) {
+                console.log('Session restored:', user.email);
+                await setupListeners();
+            } else {
+                redirectToLogin();
+            }
         }
     }
 
