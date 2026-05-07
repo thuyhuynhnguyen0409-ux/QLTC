@@ -15,7 +15,13 @@
     const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || '';
     const apiKeyGemini = env.VITE_GEMINI_API_KEY || '';
 
-    const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+        }
+    }) : null;
 
     let user = null;
     let expenses = [];
@@ -492,6 +498,14 @@ function populateConfigFields() {
             }
         });
 
+        const redirectToLogin = () => {
+            if (
+                !window.location.pathname.includes('auth.html')
+            ) {
+                window.location.href = 'auth.html';
+            }
+        };
+
         try {
             const { data: { session } } = await supabase.auth.getSession();
             user = session?.user ?? null;
@@ -506,19 +520,34 @@ function populateConfigFields() {
                     console.warn('OAuth callback error:', oauthError, oauthDesc);
                     alert(`Đăng nhập OAuth lỗi: ${oauthError}\n${oauthDesc || ''}`);
                 }
-
-                user = await waitForSession(8000);
-                console.log('index.html session after waiting=', user);
             }
         } catch (error) {
             console.error('Lỗi khi kiểm tra session Supabase:', error);
         }
 
         if (user) {
-            setupListeners();
+            console.log('Đăng nhập thành công:', user.email);
+            await setupListeners();
         } else {
-            window.location.href = 'auth.html';
-            console.log("User chưa đăng nhập");
+            console.log('Không tìm thấy session');
+            
+            // Delay để Supabase restore session
+            setTimeout(async () => {
+                const {
+                    data: { session }
+                } = await supabase.auth.getSession();
+
+                if (session?.user) {
+                    user = session.user;
+                    console.log(
+                        'Session restored sau delay:',
+                        user.email
+                    );
+                    await setupListeners();
+                } else {
+                    redirectToLogin();
+                }
+            }, 2000);
         }
     }
 
