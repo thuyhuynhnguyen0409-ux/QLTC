@@ -177,7 +177,7 @@
 
                     const { error } = await supabaseClient.auth.signInWithOAuth({
                         provider: provider,
-                        options: { redirectTo: window.location.origin + '/index.html' }
+                        options: { redirectTo: window.location.origin + '/' }
                     });
                     if (error) throw error;
 
@@ -191,7 +191,7 @@
 
                     const { error } = await supabaseClient.auth.signInWithOtp({
                         email: email,
-                        options: { emailRedirectTo: window.location.origin + '/index.html' }
+                        options: { emailRedirectTo: window.location.origin + '/' }
                     });
                     if (error) throw error;
 
