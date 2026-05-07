@@ -177,7 +177,7 @@
 
                     const { error } = await supabaseClient.auth.signInWithOAuth({
                         provider: provider,
-                        options: { redirectTo: window.location.origin + '/' }
+                        options: { redirectTo: window.location.origin + '/auth.html' }
                     });
                     if (error) throw error;
 
@@ -191,7 +191,7 @@
 
                     const { error } = await supabaseClient.auth.signInWithOtp({
                         email: email,
-                        options: { emailRedirectTo: window.location.origin + '/' }
+                        options: { emailRedirectTo: window.location.origin + '/auth.html' }
                     });
                     if (error) throw error;
 
@@ -256,6 +256,15 @@
                     console.log('auth.html restored session from hash:', restoredUser);
                     window.location.href = window.location.origin + '/index.html';
                     return;
+                }
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const oauthError = urlParams.get('error');
+                const oauthDesc = urlParams.get('error_description');
+                if (oauthError) {
+                    document.getElementById('error-display').classList.remove('hidden');
+                    document.getElementById('error-display').innerText = `OAuth lỗi: ${oauthError}` + (oauthDesc ? `\n${oauthDesc}` : '');
+                    console.warn('OAuth callback error on auth.html:', oauthError, oauthDesc);
                 }
 
                 await redirectIfSignedIn();
