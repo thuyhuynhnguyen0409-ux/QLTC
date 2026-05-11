@@ -194,16 +194,15 @@
             const usableMoney = settings.salary - totalFixed - settings.base_savings;
 
             const now = new Date();
-            // Tạo ngày bắt đầu dựa trên payday
             const start = new Date(now.getFullYear(), now.getMonth(), settings.payday);
             const end = new Date(start);
             end.setMonth(end.getMonth() + 1);
             end.setDate(end.getDate() - 1);
 
-            // 1. Insert vào monthly_cycles
+            // 1. Lưu hoặc cập nhật Chu kỳ (Monthly Cycle)
             const { data: cycle, error: cycleError } = await supabase
                 .from('monthly_cycles')
-                .insert({
+                .upsert({
                     user_id: user.id,
                     cycle_start: start.toISOString().split('T')[0],
                     cycle_end: end.toISOString().split('T')[0],
@@ -212,18 +211,18 @@
                     total_savings: settings.base_savings,
                     usable_money: usableMoney,
                     remaining_money: usableMoney,
-                    total_spent: 0
-                })
+                    is_closed: false
+                }, { onConflict: 'user_id, cycle_start' }) // Tránh trùng lặp chu kỳ
                 .select()
                 .single();
 
             if (cycleError) throw cycleError;
 
-            // 2. Chia tiền cho từng ngày (daily_budgets)
+            // 2. Chuẩn bị dữ liệu ngân sách hàng ngày
             const totalDays = Math.ceil((end - start) / 86400000) + 1;
             const dailyAmount = Math.floor(usableMoney / totalDays);
-
             const dailyEntries = [];
+
             for (let i = 0; i < totalDays; i++) {
                 const d = new Date(start);
                 d.setDate(start.getDate() + i);
@@ -237,8 +236,15 @@
                 });
             }
 
-            const { error: dailyError } = await supabase.from('daily_budgets').insert(dailyEntries);
-            if (dailyError) throw dailyError;
+            // 3. Sử dụng upsert để giải quyết lỗi "duplicate key"
+            const { error: dailyError } = await supabase
+                .from('daily_budgets')
+                .upsert(dailyEntries, { onConflict: 'user_id, budget_date' });
+
+            if (dailyError) {
+                console.error("Lỗi khi lưu ngân sách ngày:", dailyError);
+                throw dailyError;
+            }
         }
         async function recalculateSavings(
             budget
