@@ -24,9 +24,11 @@
             }
         }) : null;
 
+        // --- KHỞI TẠO BIẾN TOÀN CỤC ---
         let user = null;
         let expenses = [];
         let goals = [];
+        let fixedCosts = [];
         let settings = {
             salary: 0,
             payday: 1,
@@ -34,161 +36,112 @@
             current_savings: 0,
             enjoyment_fund: 0
         };
-
-        let fixedCosts = [];
-
         let currentCycle = null;
-
         let todayBudget = null;
-        let currentView = 'list';
-        let currentFilter = 'month';
+        let mainChart = null;
 
-        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-        const waitForSession = async (timeoutMs = 8000) => {
-            const startedAt = Date.now();
-            while (Date.now() - startedAt < timeoutMs) {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) return session.user;
-                await sleep(300);
-            }
-            return null;
+        // --- TIỆN ÍCH (UTILITIES) ---
+        window.formatMoney = (amount) => {
+            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
         };
 
-        const categories = [
-            { id: 'food', name: 'Ăn uống', icon: '🍲', color: 'bg-orange-100 text-orange-600' },
-            { id: 'transport', name: 'Di chuyển', icon: '🛵', color: 'bg-blue-100 text-blue-600' },
-            { id: 'shopping', name: 'Mua sắm', icon: '🛍️', color: 'bg-pink-100 text-pink-600' },
-            { id: 'bills', name: 'Hóa đơn', icon: '📄', color: 'bg-purple-100 text-purple-600' },
-            { id: 'other', name: 'Khác', icon: '✨', color: 'bg-slate-100 text-slate-600' }
-        ];
-        function populateConfigFields() {
+        window.parseCurrency = (str) => {
+            return parseInt(str.replace(/\D/g, '')) || 0;
+        };
 
-            document.getElementById('salaryInput').value =
-                settings.salary
-                    ? new Intl.NumberFormat('vi-VN').format(settings.salary)
-                    : '';
+        window.formatCurrencyInput = (input) => {
+            let value = input.value.replace(/\D/g, '');
+            input.value = value ? new Intl.NumberFormat('vi-VN').format(value) : '';
+        };
 
-            document.getElementById('savingsInput').value =
-                settings.base_savings
-                    ? new Intl.NumberFormat('vi-VN').format(settings.base_savings)
-                    : '';
-
-            document.getElementById('enjoymentInput').value =
-                settings.enjoyment_fund
-                    ? new Intl.NumberFormat('vi-VN').format(settings.enjoyment_fund)
-                    : '';
-
-            document.getElementById('paydayInput').value =
-                settings.payday || 1;
-
-            const fixedContainer =
-                document.getElementById('fixedCostsList');
-
-            fixedContainer.innerHTML = '';
-
-            fixedCosts.forEach(item => {
-
-                window.addFixedCostRow(
-                    item.name,
-                    item.amount
-                );
-            });
+        // --- XỬ LÝ AUTH ---
+        async function handleAuth() {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+                user = data.session.user;
+                await setupListeners();
+            } else {
+                document.getElementById('loginSection').classList.remove('hidden');
+                document.getElementById('appSection').classList.add('hidden');
+            }
         }
-        // LOGOUT 
-        window.logout = async () => {
-            if (!supabase) return;
 
-            const confirmLogout = confirm('Bạn có muốn đăng xuất không?');
-
-            if (!confirmLogout) return;
-
-            const { error } = await supabase.auth.signOut();
-
-            if (error) {
-                console.error(error);
-                alert('Đăng xuất thất bại');
-                return;
-            }
-
-            window.location.href = 'auth.html';
+        window.signInWithGoogle = async () => {
+            await supabase.auth.signInWithOAuth({ provider: 'google' });
         };
-        // --- UTILS ---
-        window.formatCurrencyInput = (i) => {
-            let v = i.value.replace(/\D/g, "");
-            i.value = v ? new Intl.NumberFormat('vi-VN').format(parseInt(v)) : "";
-        };
-        window.parseCurrency = (s) => parseInt(String(s).replace(/\D/g, "")) || 0;
-        window.formatMoney = (n) => {
 
-            const sign = n < 0 ? '-' : '';
+        // --- LOGIC NGÂN SÁCH & CSDL ---
+        async function setupListeners() {
+            if (!user) return;
 
-            return (
-                sign +
-                new Intl.NumberFormat('vi-VN')
-                    .format(Math.abs(n || 0))
-                + 'đ'
-            );
-        };
-        async function rebalanceFutureBudgets(
-            currentBudget,
-            delta
-        ) {
+            try {
+                // 1. Lấy Settings
+                const { data: settingsData } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .maybeSingle();
 
-            const today =
-                currentBudget.budget_date;
+                if (!settingsData) {
+                    document.getElementById('setupPrompt').classList.remove('hidden');
+                    document.getElementById('dashboard').classList.add('hidden');
+                    document.getElementById('appSection').classList.remove('hidden');
+                    document.getElementById('loginSection').classList.add('hidden');
+                    return;
+                }
 
-            // lấy các ngày sau
+                settings = settingsData;
+                document.getElementById('dashboard').classList.remove('hidden');
+                document.getElementById('setupPrompt').classList.add('hidden');
+                document.getElementById('appSection').classList.remove('hidden');
+                document.getElementById('loginSection').classList.add('hidden');
 
-            const { data: futureDays } =
-                await supabase
+                // 2. Kiểm tra chu kỳ
+                const todayStr = new Date().toISOString().split('T')[0];
+                const { data: cycleData } = await supabase
+                    .from('monthly_cycles')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('is_closed', false)
+                    .lte('cycle_start', todayStr)
+                    .gte('cycle_end', todayStr)
+                    .maybeSingle();
+
+                if (!cycleData) {
+                    await generateNewCycle();
+                    return setupListeners(); // Gọi lại sau khi tạo xong
+                }
+
+                currentCycle = cycleData;
+
+                // 3. Lấy ngân sách ngày
+                const { data: budgetData } = await supabase
                     .from('daily_budgets')
                     .select('*')
                     .eq('user_id', user.id)
-                    .gt('budget_date', today)
-                    .order('budget_date', {
-                        ascending: true
-                    });
+                    .eq('budget_date', todayStr)
+                    .maybeSingle();
+                
+                todayBudget = budgetData;
 
-            if (!futureDays?.length) return;
+                // 4. Lấy các dữ liệu khác
+                const [exp, fix, gl] = await Promise.all([
+                    supabase.from('expenses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                    supabase.from('fixed_costs').select('*').eq('user_id', user.id),
+                    supabase.from('goals').select('*').eq('user_id', user.id)
+                ]);
 
-            // delta âm => vượt mức
-            // delta dương => tiêu ít
+                expenses = exp.data || [];
+                fixedCosts = fix.data || [];
+                goals = gl.data || [];
 
-            const split =
-                Math.floor(
-                    Math.abs(delta)
-                    / futureDays.length
-                );
-
-            for (const day of futureDays) {
-
-                let newAllocated =
-                    day.allocated;
-
-                let newRemaining =
-                    day.remaining;
-
-                // OVERSPENT
-                if (delta < 0) {
-
-                    newAllocated -= split;
-                    newRemaining -= split;
-
-                } else {
-
-                    newAllocated += split;
-                    newRemaining += split;
-                }
-
-                await supabase
-                    .from('daily_budgets')
-                    .update({
-                        allocated: newAllocated,
-                        remaining: newRemaining
-                    })
-                    .eq('id', day.id);
+                updateUserDisplay();
+                updateUI();
+            } catch (error) {
+                console.error("Lỗi setup:", error);
             }
         }
+
         async function generateNewCycle() {
             const totalFixed = fixedCosts.reduce((s, f) => s + f.amount, 0);
             const usableMoney = settings.salary - totalFixed - settings.base_savings;
@@ -199,8 +152,7 @@
             end.setMonth(end.getMonth() + 1);
             end.setDate(end.getDate() - 1);
 
-            // 1. Lưu/Cập nhật Monthly Cycle
-            const { data: cycle, error: cycleError } = await supabase
+            const { data: cycle, error: cErr } = await supabase
                 .from('monthly_cycles')
                 .upsert({
                     user_id: user.id,
@@ -212,12 +164,11 @@
                     usable_money: usableMoney,
                     remaining_money: usableMoney,
                     is_closed: false
-                }, { onConflict: 'user_id, cycle_start' }) // Khớp với constraint unique_user_cycle_start
+                }, { onConflict: 'user_id, cycle_start' })
                 .select().single();
 
-            if (cycleError) throw cycleError;
+            if (cErr) throw cErr;
 
-            // 2. Tạo dữ liệu hàng ngày
             const totalDays = Math.ceil((end - start) / 86400000) + 1;
             const dailyAmount = Math.floor(usableMoney / totalDays);
             const dailyEntries = [];
@@ -235,200 +186,13 @@
                 });
             }
 
-            // 3. Lưu/Cập nhật Daily Budgets
-            const { error: dailyError } = await supabase
+            const { error: dErr } = await supabase
                 .from('daily_budgets')
-                .upsert(dailyEntries, { onConflict: 'user_id, budget_date' }); // Khớp với constraint unique_user_budget_date
-
-            if (dailyError) throw dailyError;
-        } async function recalculateSavings(
-            budget
-        ) {
-
-            const extraSaving =
-                Math.max(0, budget.remaining);
-
-            const difference =
-                extraSaving
-                - (budget.saved_to_savings || 0);
-
-            if (difference === 0) return;
-
-            // update savings
-
-            await supabase
-                .from('settings')
-                .update({
-                    current_savings:
-                        settings.current_savings
-                        + difference
-                })
-                .eq('user_id', user.id);
-
-            // update budget row
-
-            await supabase
-                .from('daily_budgets')
-                .update({
-                    saved_to_savings:
-                        extraSaving
-                })
-                .eq('id', budget.id);
-
-            settings.current_savings += difference;
+                .upsert(dailyEntries, { onConflict: 'user_id, budget_date' });
+            
+            if (dErr) throw dErr;
         }
-        // --- WINDOW FUNCTIONS (Để gọi từ HTML) ---
-        window.setView = (v) => { currentView = v; updateUI(); };
-        window.setFilter = (f) => { currentFilter = f; updateUI(); };
-        window.toggleConfigModal = (show) => {
-            const modal = document.getElementById('configModal');
-            if (modal) {
-                modal.classList.toggle('hidden', !show);
-                document.body.style.overflow = show ? 'hidden' : 'auto';
-                if (show) populateConfigFields();
-            }
-        };
-        window.addExpense = async () => {
 
-            if (!todayBudget) {
-                alert('Không có ngân sách hôm nay');
-                return;
-            }
-
-            const name =
-                document.getElementById('expName')
-                    .value
-                    .trim();
-
-            const amount =
-                window.parseCurrency(
-                    document.getElementById('expAmount').value
-                );
-
-            const category =
-                document.getElementById('expCategory').value;
-
-            if (!name || !amount) {
-                alert('Nhập đầy đủ');
-                return;
-            }
-
-            // KHÔNG cho vượt tiền còn lại tháng
-
-            if (
-                amount >
-                currentCycle.remaining_money
-            ) {
-
-                alert(
-                    `Bạn chỉ còn ${window.formatMoney(currentCycle.remaining_money)}`
-                );
-
-                return;
-            }
-
-            // INSERT EXPENSE
-
-            const { error: expError } =
-                await supabase
-                    .from('expenses')
-                    .insert({
-                        user_id: user.id,
-                        daily_budget_id: todayBudget.id,
-                        name,
-                        amount,
-                        category
-                    });
-
-            if (expError) {
-                console.error(expError);
-                return;
-            }
-
-            // UPDATE TODAY
-
-            const allocated =
-                todayBudget.custom_allocated ??
-                todayBudget.allocated;
-
-            const newSpent =
-                todayBudget.spent + amount;
-
-            const newRemaining =
-                allocated - newSpent;
-
-            const delta =
-                newRemaining;
-
-            await supabase
-                .from('daily_budgets')
-                .update({
-                    spent: newSpent,
-                    remaining: newRemaining
-                })
-                .eq('id', todayBudget.id);
-
-            // UPDATE CYCLE
-
-            await supabase
-                .from('monthly_cycles')
-                .update({
-                    total_spent:
-                        currentCycle.total_spent
-                        + amount,
-
-                    remaining_money:
-                        currentCycle.remaining_money
-                        - amount
-                })
-                .eq('id', currentCycle.id);
-
-            // OVERSPENT
-
-            if (delta < 0) {
-
-                await rebalanceFutureBudgets(
-                    todayBudget,
-                    delta
-                );
-            }
-
-            // RECALC SAVINGS
-
-            await recalculateSavings({
-                ...todayBudget,
-                remaining: newRemaining
-            });
-
-            // reload
-
-            await setupListeners()
-
-            document.getElementById('expName').value = '';
-            document.getElementById('expAmount').value = '';
-        };
-        window.addGoal = async () => {
-            const name = document.getElementById('goalName').value.trim();
-            const target = window.parseCurrency(document.getElementById('goalTarget').value);
-
-            if (!name || !target) return alert('Vui lòng nhập đủ thông tin');
-
-            const { error } = await supabase
-                .from('goals')
-                .insert({
-                    user_id: user.id,
-                    name: name,
-                    target: target,
-                    current: 0, // Khớp với cột 'current' trong Schema của bạn
-                    completed: false
-                });
-
-            if (!error) {
-                document.getElementById('goalName').value = '';
-                document.getElementById('goalTarget').value = '';
-                setupListeners();
-            }
-        };
         window.initBudget = async () => {
             const salaryVal = window.parseCurrency(document.getElementById('salaryInput').value);
             const savingsVal = window.parseCurrency(document.getElementById('savingsInput').value);
@@ -439,393 +203,68 @@
             document.querySelectorAll('.fixed-cost-row').forEach(row => {
                 const name = row.querySelector('.fixed-name').value;
                 const amount = window.parseCurrency(row.querySelector('.fixed-amount').value);
-                if (name && amount) {
-                    fixedCostsArr.push({ user_id: user.id, name, amount });
-                }
+                if (name && amount) fixedCostsArr.push({ user_id: user.id, name, amount });
             });
 
             try {
-                // Lưu hoặc cập nhật Settings
-                const { error: settingsError } = await supabase
-                    .from('settings')
-                    .upsert({
-                        user_id: user.id,
-                        salary: salaryVal,
-                        payday: paydayVal,
-                        base_savings: savingsVal,
-                        current_savings: savingsVal,
-                        enjoyment_fund: enjoymentVal,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'user_id' }); // Sử dụng constraint unique_user_settings
+                const { error: sErr } = await supabase.from('settings').upsert({
+                    user_id: user.id,
+                    salary: salaryVal,
+                    payday: paydayVal,
+                    base_savings: savingsVal,
+                    current_savings: savingsVal,
+                    enjoyment_fund: enjoymentVal,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
 
-                if (settingsError) throw settingsError;
+                if (sErr) throw sErr;
 
-                // Xóa và chèn lại phí cố định
                 await supabase.from('fixed_costs').delete().eq('user_id', user.id);
-                if (fixedCostsArr.length > 0) {
-                    await supabase.from('fixed_costs').insert(fixedCostsArr);
-                }
+                if (fixedCostsArr.length > 0) await supabase.from('fixed_costs').insert(fixedCostsArr);
 
-                // Cập nhật biến local để app dùng ngay
                 settings = { salary: salaryVal, payday: paydayVal, base_savings: savingsVal, current_savings: savingsVal, enjoyment_fund: enjoymentVal };
                 fixedCosts = fixedCostsArr;
 
                 await generateNewCycle();
                 window.toggleConfigModal(false);
-                await setupListeners(); // Tải lại toàn bộ dashboard
-
+                await setupListeners();
                 alert("Thiết lập thành công!");
-            } catch (error) {
-                alert("Lỗi thiết lập: " + error.message);
-            }
-        }; const container = document.getElementById('fixedCostsList');
-
-        const div = document.createElement('div');
-        div.className = 'fixed-cost-row flex gap-2 mb-3';
-
-        div.innerHTML = `
-            <input
-                type="text"
-                class="fixed-name flex-1 p-3 bg-slate-50 rounded-xl"
-                placeholder="Tên phí"
-                value="${name}"
-            >
-
-            <input
-                type="text"
-                class="fixed-amount w-32 p-3 bg-slate-50 rounded-xl"
-                placeholder="0"
-                value="${amount}"
-                oninput="window.formatCurrencyInput(this)"
-            >
-        `;
-
-        container.appendChild(div);
-
-        // --- SUPABASE LOGIC ---
-        async function setupListeners() {
-            if (!user) return;
-
-            try {
-                const { data: settingsData } = await supabase
-                    .from('settings')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .maybeSingle();
-
-                if (!settingsData) {
-                    document.getElementById('setupPrompt')?.classList.remove('hidden');
-                    document.getElementById('dashboard')?.classList.add('hidden');
-                    return;
-                }
-
-                settings = settingsData;
-                document.getElementById('dashboard')?.classList.remove('hidden');
-                document.getElementById('setupPrompt')?.classList.add('hidden');
-
-                const today = new Date().toISOString().split('T')[0];
-                const { data: cycleData } = await supabase
-                    .from('monthly_cycles')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('is_closed', false)
-                    .lte('cycle_start', today)
-                    .gte('cycle_end', today)
-                    .maybeSingle();
-
-                if (!cycleData) {
-                    await generateNewCycle();
-                    // Quay lại hàm để lấy dữ liệu vừa tạo
-                    return setupListeners();
-                }
-
-                currentCycle = cycleData;
-
-                // Tải các bảng khác
-                const [exp, fix, gl] = await Promise.all([
-                    supabase.from('expenses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                    supabase.from('fixed_costs').select('*').eq('user_id', user.id),
-                    supabase.from('goals').select('*').eq('user_id', user.id)
-                ]);
-
-                expenses = exp.data || [];
-                fixedCosts = fix.data || [];
-                goals = gl.data || [];
-
-                updateUserDisplay();
-                updateUI();
-
-            } catch (error) {
-                console.error("Lỗi đồng bộ:", error);
-            }
-        } // AI Suggestion
-        window.suggestFood = async () => {
-            const btn = document.getElementById('btnSuggest');
-            const chefText = document.getElementById('aiChefText');
-
-            if (!btn) return;
-
-            if (!apiKeyGemini) {
-                alert('Thiếu Gemini API Key');
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = "👩‍🍳 Đang tính...";
-
-            const dailyVal =
-                window.parseCurrency(
-                    document.getElementById('dailyVal')?.innerText || "0"
-                );
-
-            const note =
-                document.getElementById('chefNote')?.value ||
-                "đa dạng";
-
-            try {
-                const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKeyGemini}`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [{
-                                    text:
-                                        `Gợi ý 1 mâm cơm Việt Nam gồm:
-- tầm 2-3 món tùy theo ngân sách
-
-Ngân sách: ${dailyVal} VNĐ
-Yêu cầu: ${note}
-Giá cả trung bình nguyên liệu
-Hướng dẫn cách làm món ăn ngắn gọn
-Trả lời ngắn gọn.`
-                                }]
-                            }]
-                        })
-                    }
-                );
-
-                const data = await response.json();
-
-                console.log(data);
-
-                if (data.error) {
-                    chefText.innerText =
-                        "Gemini API lỗi: " +
-                        data.error.message;
-                } else {
-                    chefText.innerText =
-                        data.candidates?.[0]?.content?.parts?.[0]?.text ||
-                        "Không nhận được phản hồi AI";
-                }
-
-            } catch (err) {
-                console.error(err);
-
-                chefText.innerText =
-                    "Không thể kết nối Gemini API";
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = "🍚 Gợi ý";
-            }
+            } catch (e) { alert("Lỗi: " + e.message); }
         };
 
-        // --- UI UPDATES ---
+        // --- UI & CHART ---
         function updateUI() {
             const totalFixed = fixedCosts.reduce((s, f) => s + f.amount, 0);
-            const now = new Date();
-
-            // Đổi config -> settings
-            const safeSetText = (id, text) => {
+            
+            const safeSetText = (id, val) => {
                 const el = document.getElementById(id);
-                if (el) el.innerText = text;
+                if (el) el.innerText = val;
             };
 
             safeSetText('salaryDisplay', window.formatMoney(settings.salary));
             safeSetText('savingsDisplay', window.formatMoney(settings.current_savings));
             safeSetText('fixedCostsDisplay', window.formatMoney(totalFixed));
+            safeSetText('todayBudgetText', window.formatMoney(todayBudget?.remaining || 0));
 
-            const filteredExpenses = expenses.filter(e => {
-                const d = new Date(e.created_at);
-                if (currentFilter === 'today') return d.toDateString() === now.toDateString();
-                if (currentFilter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                return true;
-            });
-
-
-            const totalReserved = (settings.current_savings || 0) + (settings.enjoyment_fund || 0);
-            const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-            const remainingDays = lastDayOfMonth - now.getDate() + 1;
-            const daily =
-                todayBudget?.remaining || 0;
-
-            const totalSpent =
-                currentCycle?.total_spent || 0;
-
-            const totalRemaining =
-                currentCycle?.remaining_money || 0;
-
-            // Update DOM elements
-
-            const dailyEl =
-                document.getElementById('dailyVal');
-
-            if (dailyEl) {
-
-                dailyEl.innerText =
-                    window.formatMoney(daily);
-
-                if (daily < 0) {
-
-                    dailyEl.classList.remove(
-                        'text-indigo-600'
-                    );
-
-                    dailyEl.classList.add(
-                        'text-rose-500'
-                    );
-
-                } else {
-
-                    dailyEl.classList.remove(
-                        'text-rose-500'
-                    );
-
-                    dailyEl.classList.add(
-                        'text-indigo-600'
-                    );
-                }
-            }
-            safeSetText('salaryDisplay', window.formatMoney(settings.salary));
-            safeSetText('savingsDisplay', window.formatMoney(settings.current_savings));
-            safeSetText('fixedCostsDisplay', window.formatMoney(totalFixed));
-            safeSetText('filterText', currentFilter === 'today' ? 'Hôm nay' : 'Tháng này');
-            safeSetText('totalFiltered', window.formatMoney(totalSpent));
-
-            // Tab Switch
-            if (currentView === 'stats') {
-                document.getElementById('statsView')?.classList.remove('hidden');
-                document.getElementById('listView')?.classList.add('hidden');
-                renderStats(filteredExpenses);
-            } else {
-                document.getElementById('statsView')?.classList.add('hidden');
-                document.getElementById('listView')?.classList.remove('hidden');
-                renderList(filteredExpenses);
-            }
-
-            updateMainChart(
-                totalFixed,
-                currentCycle?.total_spent || 0,
-                currentCycle?.remaining_money || 0,
-                settings.current_savings // Lấy từ bảng settings
-            );
+            renderExpenses();
             renderGoals();
+            updateChart(totalFixed);
         }
 
-        function renderList(list) {
-            const container = document.getElementById('expenseList');
-            if (!container) return;
-            container.innerHTML = list.length ? '' : '<div class="text-center py-20 opacity-30"><p class="text-sm font-bold">Chưa có chi tiêu...</p></div>';
-            list.forEach(e => {
-                const cat = categories.find(c => c.id === e.category) || categories[4];
-                container.innerHTML += `
-                <div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-50 mb-3">
-                    <div class="flex items-center gap-3">
-                        <div class="${cat.color} w-11 h-11 rounded-xl flex items-center justify-center text-xl">${cat.icon}</div>
-                        <div>
-                            <p class="font-bold text-sm text-slate-800">${e.name}</p>
-                            <p class="text-[10px] text-slate-400 uppercase font-bold">${cat.name}</p>
-                        </div>
-                    </div>
-                    <b class="text-rose-500 text-sm">-${window.formatMoney(e.amount)}</b>
-                </div>`;
-            });
-        }
+        function updateChart(totalFixed) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            const spent = currentCycle?.total_spent || 0;
+            const remaining = currentCycle?.remaining_money || 0;
 
-        function renderStats(list) {
-            const container = document.getElementById('statsView');
-            if (!container) return;
-            const grouped = {};
-            list.forEach(e => grouped[e.category] = (grouped[e.category] || 0) + e.amount);
+            if (mainChart) mainChart.destroy();
 
-            let html = '<div class="space-y-4">';
-            categories.forEach(cat => {
-                const amount = grouped[cat.id] || 0;
-                const total = list.reduce((s, e) => s + e.amount, 0) || 1;
-                const percent = (amount / total) * 100;
-                html += `
-                <div class="bg-white p-4 rounded-2xl border border-slate-50">
-                    <div class="flex justify-between mb-2">
-                        <span class="text-sm font-bold">${cat.icon} ${cat.name}</span>
-                        <span class="text-sm font-black text-rose-500">${window.formatMoney(amount)}</span>
-                    </div>
-                    <div class="w-full bg-slate-50 h-2 rounded-full overflow-hidden">
-                        <div class="h-full bg-indigo-500" style="width: ${percent}%"></div>
-                    </div>
-                </div>`;
-            });
-            container.innerHTML = html + '</div>';
-        }
-
-        function renderGoals() {
-            const container = document.getElementById('goalList');
-
-            if (!container) return;
-
-            if (!goals.length) {
-                container.innerHTML = `
-                <div class="text-sm text-slate-400">
-                    Chưa có mục tiêu
-                </div>
-            `;
-                return;
-            }
-
-            container.innerHTML = goals.map(goal => {
-                const percent = Math.min(
-                    100,
-                    ((goal.current || 0) / goal.target) * 100
-                );
-
-                return `
-                <div class="bg-slate-50 p-5 rounded-2xl">
-                    <div class="flex justify-between mb-2">
-                        <b>${goal.name}</b>
-                        <span>${percent.toFixed(0)}%</span>
-                    </div>
-
-                    <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                            class="h-full bg-indigo-500"
-                            style="width:${percent}%"
-                        ></div>
-                    </div>
-
-                    <div class="mt-2 text-sm text-slate-500">
-                        ${window.formatMoney(goal.current || 0)}
-                        /
-                        ${window.formatMoney(goal.target)}
-                    </div>
-                </div>
-            `;
-            }).join('');
-        }
-
-        function updateMainChart(fixed, spent, remaining, reserved) {
-            const canvas = document.getElementById('mainChart');
-            if (!canvas || typeof Chart === 'undefined') return;
-            const ctx = canvas.getContext('2d');
-            if (window.myChart) window.myChart.destroy();
-            window.myChart = new Chart(ctx, {
+            mainChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Cố định', 'Đã tiêu', 'Còn lại', 'Tích lũy'],
+                    labels: ['Đã tiêu', 'Còn lại', 'Cố định', 'Tiết kiệm'],
                     datasets: [{
-                        data: [fixed, spent, remaining, reserved],
-                        backgroundColor: ['#6366f1', '#f43f5e', '#10b981', '#f59e0b'],
+                        data: [spent, remaining, totalFixed, settings.base_savings],
+                        backgroundColor: ['#6366f1', '#e2e8f0', '#f43f5e', '#10b981'],
                         borderWidth: 0
                     }]
                 },
@@ -833,345 +272,227 @@ Trả lời ngắn gọn.`
             });
         }
 
-        // Kiểm tra Auth khi load trang
-        function updateUserDisplay() {
-            const display = document.getElementById('userEmailDisplay');
-            if (!display) return;
-            if (user && user.email) {
-                display.innerText = `Xin chào, ${user.email}`;
-            } else {
-                display.innerText = '';
-            }
+        function renderExpenses() {
+            const container = document.getElementById('expenseList');
+            container.innerHTML = expenses.map(exp => `
+                <div class="flex justify-between items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-50">
+                    <div>
+                        <p class="font-bold text-slate-800">${exp.name}</p>
+                        <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest">${exp.category}</p>
+                    </div>
+                    <p class="font-black text-rose-500">-${window.formatMoney(exp.amount)}</p>
+                </div>
+            `).join('');
         }
 
-        async function init() {
-            if (!supabase) {
-                document.getElementById('dashboard')?.classList.add('hidden');
-                document.getElementById('setupPrompt')?.classList.remove('hidden');
-                console.error('Supabase client không thể khởi tạo vì thiếu biến môi trường.');
-                return;
-            }
+        function renderGoals() {
+            const container = document.getElementById('goalList');
+            container.innerHTML = goals.map(goal => {
+                const percent = Math.min((goal.current / goal.target) * 100, 100);
+                return `
+                <div class="p-4 bg-indigo-50 rounded-2xl space-y-2">
+                    <div class="flex justify-between text-xs font-bold">
+                        <span>${goal.name}</span>
+                        <span>${Math.round(percent)}%</span>
+                    </div>
+                    <div class="h-2 bg-white rounded-full overflow-hidden">
+                        <div class="h-full bg-indigo-500" style="width: ${percent}%"></div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
 
-            supabase.auth.onAuthStateChange((event, session) => {
-                if (session?.user) {
-                    if (!user) {
-                        user = session.user;
-                        setupListeners();
-                    }
-                    return;
-                }
-                if (event === 'SIGNED_OUT') {
-                    window.location.href = 'auth.html';
-                }
-            });
-
-            const redirectToLogin = () => {
-                if (
-                    !window.location.pathname.includes('auth.html')
-                ) {
-                    window.location.href = 'auth.html';
-                }
-            };
+        // --- AI CHEF (Sửa model gemini-1.5-flash) ---
+        window.suggestFood = async () => {
+            const btn = document.getElementById('suggestBtn');
+            btn.innerText = "Đang nghĩ...";
+            btn.disabled = true;
 
             try {
-                const { data: { session } } = await supabase.auth.getSession();
-                user = session?.user ?? null;
-                console.log('index.html current URL=', window.location.href);
-                console.log('index.html current session=', session);
-
-                if (!user) {
-                    const params = new URLSearchParams(window.location.search);
-                    const oauthError = params.get('error');
-                    const oauthDesc = params.get('error_description');
-                    if (oauthError) {
-                        console.warn('OAuth callback error:', oauthError, oauthDesc);
-                        alert(`Đăng nhập OAuth lỗi: ${oauthError}\n${oauthDesc || ''}`);
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyGemini}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{ text: "Gợi ý 1 thực đơn mâm cơm gia đình Việt Nam bình dân dưới 100k, gồm tên món và giá ước tính. Ngắn gọn." }]
+                            }]
+                        })
                     }
-                }
-            } catch (error) {
-                console.error('Lỗi khi kiểm tra session Supabase:', error);
+                );
+                const data = await response.json();
+                const text = data.candidates[0].content.parts[0].text;
+                document.getElementById('aiChefContent').innerHTML = `<p class="text-sm italic text-slate-600">${text}</p>`;
+            } catch (e) {
+                console.error(e);
+            } finally {
+                btn.innerText = "Gợi ý mâm cơm AI";
+                btn.disabled = false;
             }
+        };
 
-            if (user) {
-                console.log('Đăng nhập thành công:', user.email);
-                await setupListeners();
-            } else {
-                console.log('Không tìm thấy session');
+        // --- MODAL & UI HELPERS ---
+        window.toggleConfigModal = (show) => {
+            document.getElementById('configModal').classList.toggle('hidden', !show);
+        };
 
-                // Chờ Supabase restore session từ URL hash
-                user = await waitForSession(8000);
-                if (user) {
-                    console.log('Session restored:', user.email);
-                    await setupListeners();
-                } else {
-                    redirectToLogin();
-                }
+        window.addFixedCostRow = () => {
+            const container = document.getElementById('fixedCostsList');
+            const div = document.createElement('div');
+            div.className = 'fixed-cost-row flex gap-2 mb-2';
+            div.innerHTML = `
+                <input type="text" placeholder="Tên phí" class="fixed-name flex-1 p-3 bg-slate-50 rounded-xl outline-none text-sm">
+                <input type="text" placeholder="Số tiền" oninput="window.formatCurrencyInput(this)" class="fixed-amount w-1/3 p-3 bg-slate-50 rounded-xl outline-none text-sm font-bold">
+                <button onclick="this.parentElement.remove()" class="text-rose-500 px-2">✕</button>
+            `;
+            container.appendChild(div);
+        };
+
+        function updateUserDisplay() {
+            document.getElementById('userName').innerText = user.user_metadata.full_name || user.email;
+            if (user.user_metadata.avatar_url) {
+                document.getElementById('userAvatar').src = user.user_metadata.avatar_url;
             }
         }
 
-        init();
+        // --- KHỞI CHẠY ---
+        handleAuth();
     </script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
-
-        .glass {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .hidden { display: none; }
     </style>
 </head>
 
-<body class="bg-slate-50 text-slate-900 selection:bg-indigo-100">
-    <div class="max-w-6xl mx-auto p-4 md:p-8">
-        <!-- Header -->
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-3xl font-extrabold tracking-tight">BQT Finance <span class="text-indigo-600">AI</span>
-                </h1>
-                <p id="userEmailDisplay" class="text-slate-500 text-sm mt-2"></p>
-                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Quản lý & Đầu bếp gia đình</p>
-            </div>
-            <div class="flex gap-3">
-                <!-- NÚT ĐĂNG XUẤT -->
-                <button onclick="window.logout()"
-                    class="bg-rose-500 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-sm hover:bg-rose-600 transition-all active:scale-95">
-                    🚪 Đăng xuất
-                </button>
+<body class="bg-[#F8FAFC] text-slate-900 min-h-screen">
+    <div id="loginSection" class="hidden flex flex-col items-center justify-center min-h-screen p-6 text-center">
+        <div class="w-24 h-24 bg-indigo-600 rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-indigo-200 mb-8">
+            <span class="text-4xl">💰</span>
+        </div>
+        <h1 class="text-3xl font-black tracking-tight mb-2">Finance Master</h1>
+        <p class="text-slate-400 font-medium mb-12">Quản lý tài chính & Gợi ý nấu ăn AI</p>
+        <button onclick="window.signInWithGoogle()" 
+            class="w-full max-w-xs bg-white border border-slate-200 text-slate-700 py-4 rounded-3xl font-bold flex items-center justify-center gap-3 shadow-sm active:scale-95 transition-all">
+            <img src="https://www.google.com/favicon.ico" class="w-5 h-5">
+            Tiếp tục với Google
+        </button>
+    </div>
 
-                <!-- NÚT CẤU HÌNH -->
-                <button onclick="window.toggleConfigModal(true)"
-                    class="bg-white border-2 border-slate-100 px-6 py-3 rounded-2xl font-bold text-sm shadow-sm hover:border-indigo-100 transition-all active:scale-95">
-                    ⚙️ Cấu hình ngân sách
-                </button>
+    <div id="appSection" class="hidden pb-24">
+        <header class="p-6 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-30">
+            <div class="flex items-center gap-3">
+                <img id="userAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky" class="w-12 h-12 rounded-2xl bg-indigo-50">
+                <div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chào mừng</p>
+                    <h2 id="userName" class="font-bold text-slate-800">Người dùng</h2>
+                </div>
             </div>
+            <button onclick="window.toggleConfigModal(true)" class="p-3 bg-slate-50 rounded-2xl text-slate-600">⚙️</button>
         </header>
 
-        <!-- Initial Setup -->
-        <div id="setupPrompt"
-            class="hidden text-center py-20 bg-white rounded-[3rem] shadow-xl border-2 border-dashed border-slate-200 px-6">
-            <span class="text-6xl mb-6 block">🏦</span>
-            <h2 class="text-2xl font-extrabold text-slate-800 mb-2">Bắt đầu quản lý tài chính</h2>
-            <p class="text-slate-400 text-sm mb-8">Thiết lập thu nhập để AI giúp bạn cân đối chi tiêu.</p>
-            <button onclick="window.toggleConfigModal(true)"
-                class="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black shadow-lg">Cấu hình ngay</button>
+        <div id="setupPrompt" class="hidden p-6 text-center space-y-6">
+            <div class="py-12 bg-white rounded-[3rem] shadow-sm border border-slate-100">
+                <div class="text-5xl mb-4">🚀</div>
+                <h3 class="text-xl font-bold px-8">Bắt đầu hành trình tài chính của bạn</h3>
+                <p class="text-slate-400 text-sm mt-2 px-8">Hãy thiết lập thu nhập và phí cố định để AI giúp bạn phân bổ chi tiêu.</p>
+                <button onclick="window.toggleConfigModal(true)" class="mt-8 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-indigo-100">Cấu hình ngay</button>
+            </div>
         </div>
 
-        <div id="dashboard" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
-            <!-- Left Side -->
-            <div class="lg:col-span-8 space-y-8 order-2 lg:order-1">
-                <!-- AI Chef Section -->
-                <section class="bg-emerald-600 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
-                    <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center justify-between mb-6">
-                            <h3 class="text-lg font-extrabold flex items-center gap-2">👩‍🍳 AI Chef gợi ý</h3>
-                            <span class="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black tracking-widest">THỰC
-                                ĐƠN HÔM NAY</span>
-                        </div>
-                        <div
-                            class="bg-white p-6 rounded-3xl shadow-inner mb-6 min-h-[100px] flex items-center justify-center border-4 border-emerald-500/20">
-                            <p id="aiChefText" class="text-slate-700 font-bold italic text-center">"Nhập mong muốn và
-                                ngân sách của bạn sẽ được AI tính toán!"</p>
-                        </div>
-                        <div class="flex gap-2 mb-4">
-                            <input type="text" id="chefNote" placeholder="Ví dụ: có món nước, ăn cá, không cay..."
-                                class="flex-1 p-4 bg-emerald-700/30 border border-emerald-400/30 rounded-2xl text-sm placeholder:text-emerald-100/60 outline-none focus:bg-emerald-700/50 transition-all">
-                            <button onclick="window.suggestFood()" id="btnSuggest"
-                                class="bg-white text-emerald-700 px-6 py-4 rounded-2xl font-black text-xs hover:bg-emerald-50 active:scale-95 shadow-md">🍚
-                                Gợi ý</button>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Transactions & Stats Section -->
-                <section
-                    class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col min-h-[600px]">
-                    <div
-                        class="p-6 border-b border-slate-50 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/20">
-                        <div class="flex bg-slate-200/50 p-1 rounded-2xl self-start md:self-auto">
-                            <button id="btnViewList" onclick="window.setView('list')"
-                                class="px-6 py-2 rounded-xl text-[11px] font-black transition-all">DANH SÁCH</button>
-                            <button id="btnViewStats" onclick="window.setView('stats')"
-                                class="px-6 py-2 rounded-xl text-[11px] font-black transition-all">THỐNG KÊ</button>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="window.setFilter('today')"
-                                class="px-4 py-2 rounded-xl text-[10px] font-bold border border-slate-200 hover:bg-white active:scale-95">NGÀY</button>
-                            <button onclick="window.setFilter('month')"
-                                class="px-4 py-2 rounded-xl text-[10px] font-bold border border-slate-200 hover:bg-white active:scale-95">THÁNG</button>
-                        </div>
-                    </div>
-
-                    <div class="p-6 bg-indigo-50/30 border-b border-slate-50 flex justify-between items-center">
+        <div id="dashboard" class="hidden p-6 space-y-6">
+            <div class="relative bg-indigo-600 rounded-[3rem] p-8 text-white overflow-hidden shadow-2xl shadow-indigo-100">
+                <div class="relative z-10 space-y-6">
+                    <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Tổng chi <span
-                                    id="filterText">Tháng này</span></p>
-                            <h4 id="totalFiltered" class="text-xl font-black text-indigo-900">0đ</h4>
+                            <p class="text-indigo-100/80 text-[10px] font-black uppercase tracking-[0.2em]">Hôm nay bạn còn</p>
+                            <h3 id="todayBudgetText" class="text-4xl font-black mt-1">0đ</h3>
                         </div>
-                        <span class="text-2xl opacity-20">📊</span>
+                        <div class="w-24 h-24">
+                            <canvas id="mainChart"></canvas>
+                        </div>
                     </div>
-
-                    <div id="listView" class="flex-1 overflow-y-auto p-6 mobile-height custom-scroll">
-                        <div id="expenseList"></div>
+                    <div class="grid grid-cols-2 gap-4 pt-4 border-t border-indigo-500/30">
+                        <div>
+                            <p class="text-indigo-100/60 text-[10px] font-black uppercase tracking-widest">Thu nhập</p>
+                            <p id="salaryDisplay" class="font-bold">0đ</p>
+                        </div>
+                        <div>
+                            <p class="text-indigo-100/60 text-[10px] font-black uppercase tracking-widest">Tiết kiệm</p>
+                            <p id="savingsDisplay" class="font-bold text-emerald-300">0đ</p>
+                        </div>
                     </div>
-
-                    <div id="statsView" class="hidden flex-1 overflow-y-auto p-6 mobile-height custom-scroll">
-                        <!-- Stats dynamic content -->
-                    </div>
-                </section>
-
-                <!-- Savings Goals -->
-                <section class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-                    <h3 class="font-extrabold mb-6 text-indigo-600 flex items-center gap-2">🎯 Mục tiêu của bạn</h3>
-                    <div id="goalList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-                    <div class="mt-8 pt-8 border-t border-slate-50 flex flex-col md:flex-row gap-3">
-                        <input type="text" id="goalName" placeholder="Tên mục tiêu..."
-                            class="flex-1 p-4 bg-slate-50 rounded-2xl text-sm outline-none">
-                        <input type="text" id="goalTarget" oninput="window.formatCurrencyInput(this)"
-                            placeholder="Số tiền"
-                            class="w-full md:w-36 p-4 bg-slate-50 rounded-2xl text-sm outline-none font-bold">
-                        <button onclick="window.addGoal()"
-                            class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold active:scale-95">Thêm</button>
-                    </div>
-                </section>
+                </div>
             </div>
 
-            <!-- Right Side (Summary & Entry) -->
-            <div class="lg:col-span-4 space-y-6 order-1 lg:order-2">
-                <!-- Summary Card -->
-                <section
-                    class="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl border border-slate-100 text-center relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-4 opacity-5">💰</div>
-                    <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Chi tiêu mỗi ngày
-                    </p>
-                    <h2 id="dailyVal" class="text-4xl md:text-5xl font-black text-indigo-600 mb-8 tabular-nums">0đ</h2>
+            <div class="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-50">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="text-2xl">👨‍🍳</span>
+                    <h3 class="font-bold">AI Home Chef</h3>
+                </div>
+                <div id="aiChefContent" class="mb-4 min-h-[50px] flex items-center justify-center">
+                    <p class="text-slate-400 text-sm italic">Hôm nay nấu gì cho tiết kiệm nhỉ?</p>
+                </div>
+                <button id="suggestBtn" onclick="window.suggestFood()" 
+                    class="w-full py-4 bg-orange-50 text-orange-600 rounded-2xl font-black text-sm active:scale-95 transition-all">
+                    Gợi ý mâm cơm AI
+                </button>
+            </div>
 
-                    <div class="relative w-52 h-52 mx-auto mb-8">
-                        <canvas id="mainChart"></canvas>
-                        <div class="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                            <span class="text-[9px] font-bold text-slate-400 uppercase">Thu nhập</span>
-                            <span id="salaryDisplay" class="text-sm font-black text-slate-800">0đ</span>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4 pt-6 border-t border-slate-50 text-left">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <span class="text-[10px] text-slate-400 font-extrabold uppercase block">Cố định</span>
-                                <p id="fixedCostsDisplay" class="text-sm font-black text-slate-800">0đ</p>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-[10px] text-slate-400 font-extrabold uppercase block">Tích lũy</span>
-                                <p id="savingsDisplay" class="text-sm font-black text-emerald-500">0đ</p>
-                            </div>
-                        </div>
-                        <div id="fixedDisplayList" class="bg-slate-50 p-3 rounded-2xl space-y-1"></div>
-                    </div>
-                </section>
-
-                <!-- New Transaction -->
-                <section class="bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-white">
-                    <h3 class="font-extrabold mb-6 text-indigo-400 flex items-center gap-2">✍️ Ghi chép mới</h3>
-                    <div class="space-y-4">
-                        <div class="space-y-1">
-                            <label class="text-[9px] font-black text-slate-500 uppercase ml-2">Nội dung</label>
-                            <input type="text" id="expName" placeholder="Tên khoản chi..."
-                                class="w-full p-4 bg-slate-800 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none text-sm transition-all">
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <div class="space-y-1">
-                                <label class="text-[9px] font-black text-slate-500 uppercase ml-2">Số tiền</label>
-                                <input type="text" id="expAmount" oninput="window.formatCurrencyInput(this)"
-                                    placeholder="0"
-                                    class="w-full p-4 bg-slate-800 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none text-sm font-black text-rose-400">
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-[9px] font-black text-slate-500 uppercase ml-2">Loại</label>
-                                <select id="expCategory"
-                                    class="w-full p-4 bg-slate-800 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none text-sm font-bold text-slate-300 appearance-none">
-                                    <option value="food">🍲 Ăn uống</option>
-                                    <option value="transport">🚗 Di chuyển</option>
-                                    <option value="shopping">🛍️ Mua sắm</option>
-                                    <option value="bills">📄 Hóa đơn</option>
-                                    <option value="other">✨ Khác</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button onclick="window.addExpense()"
-                            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-5 rounded-2xl font-black text-sm shadow-xl transition-all active:scale-95">Lưu
-                            chi tiêu</button>
-                    </div>
-                </section>
+            <div class="grid grid-cols-1 gap-6">
+                <div>
+                    <h3 class="font-black text-slate-800 mb-4 px-2">Chi tiêu gần đây</h3>
+                    <div id="expenseList" class="space-y-3"></div>
+                </div>
+                <div>
+                    <h3 class="font-black text-slate-800 mb-4 px-2">Mục tiêu tích lũy</h3>
+                    <div id="goalList" class="space-y-3"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Configuration Modal -->
-    <div id="configModal"
-        class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-        <div
-            class="bg-white w-full max-w-lg rounded-t-[3rem] md:rounded-[3rem] p-8 md:p-10 shadow-2xl max-h-[90vh] flex flex-col animate-slide-up">
+    <div id="configModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div class="w-full max-w-lg bg-white rounded-[3rem] p-8 animate-in slide-in-from-bottom duration-300">
             <div class="flex justify-between items-center mb-8">
-                <h2 class="text-2xl font-extrabold">Cấu hình ngân sách</h2>
-                <button onclick="window.toggleConfigModal(false)"
-                    class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200">✕</button>
+                <h3 class="text-2xl font-black">Thiết lập tài chính</h3>
+                <button onclick="window.toggleConfigModal(false)" class="text-slate-400 text-2xl">✕</button>
             </div>
-            <div class="flex-1 overflow-y-auto space-y-6 pr-2 custom-scroll">
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu nhập hàng
-                        tháng</label>
-                    <input type="text" id="salaryInput" oninput="window.formatCurrencyInput(this)" placeholder="0"
-                        class="w-full p-6 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-3xl outline-none focus:border-indigo-100 text-indigo-600">
+            
+            <div class="space-y-6 max-h-[60vh] overflow-y-auto px-1">
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu nhập hàng tháng</label>
+                        <input type="text" id="salaryInput" oninput="window.formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày nhận lương</label>
+                        <input type="number" id="paydayInput" min="1" max="31" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mục tiêu tiết kiệm</label>
+                        <input type="text" id="savingsInput" oninput="window.formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quỹ hưởng thụ</label>
+                        <input type="text" id="enjoymentInput" oninput="window.formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                    </div>
                 </div>
-                <div class="space-y-2">
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        Ngày nhận lương
-                    </label>
 
-                    <input type="number" id="paydayInput" min="1" max="31"
-                        class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold" placeholder="10">
-                </div>
-                <div class="space-y-4 pt-4">
+                <div class="space-y-4 pt-4 border-t border-slate-100">
                     <div class="flex justify-between items-center">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Các phí cố định
-                            (Tiền nhà, điện...)</label>
-                        <button onclick="window.addFixedCostRow()"
-                            class="text-[10px] font-black text-indigo-600 underline">THÊM PHÍ</button>
+                        <h4 class="font-bold text-sm">Khoản phí cố định</h4>
+                        <button onclick="window.addFixedCostRow()" class="text-indigo-600 text-sm font-bold">+ Thêm mới</button>
                     </div>
                     <div id="fixedCostsList"></div>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            Ngày nhận lương
-                        </label>
+            </div>
 
-                        <input type="number" id="paydayInput" min="1" max="31"
-                            class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mục tiêu tiết
-                            kiệm</label>
-                        <input type="text" id="savingsInput" oninput="window.formatCurrencyInput(this)"
-                            class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quỹ hưởng
-                            thụ</label>
-                        <input type="text" id="enjoymentInput" oninput="window.formatCurrencyInput(this)"
-                            class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                    </div>
-                </div>
-            </div>
-            <div class="pt-6 mt-4 flex gap-4">
-                <button onclick="window.initBudget()"
-                    class="flex-1 bg-indigo-600 text-white py-5 rounded-[1.5rem] font-black shadow-lg shadow-indigo-100">Xác
-                    nhận thiết lập</button>
-            </div>
+            <button onclick="window.initBudget()" class="w-full mt-8 bg-indigo-600 text-white py-5 rounded-[1.5rem] font-black shadow-lg shadow-indigo-100 active:scale-95 transition-all">
+                Xác nhận thiết lập
+            </button>
         </div>
     </div>
 </body>
