@@ -8,357 +8,195 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/env.js"></script>
-    <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+   <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-        const env = window.ENV || {};
-        const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
-        const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || '';
-        const apiKeyGemini = env.VITE_GEMINI_API_KEY || '';
+    const env = window.ENV || {};
+    const SUPABASE_URL = env.VITE_SUPABASE_URL || '';
+    const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || '';
+    const apiKeyGemini = env.VITE_GEMINI_API_KEY || '';
 
-        const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            auth: {
-                persistSession: true,
-                autoRefreshToken: true,
-                detectSessionInUrl: true
-            }
-        }) : null;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // --- KHỞI TẠO BIẾN TOÀN CỤC ---
-        let user = null;
-        let expenses = [];
-        let goals = [];
-        let fixedCosts = [];
-        let settings = {
-            salary: 0,
-            payday: 1,
-            base_savings: 0,
-            current_savings: 0,
-            enjoyment_fund: 0
-        };
-        let currentCycle = null;
-        let todayBudget = null;
-        let mainChart = null;
+    // --- BIẾN TOÀN CỤC ---
+    let user = null, expenses = [], goals = [], fixedCosts = [], currentCycle = null, todayBudget = null, mainChart = null;
+    let settings = { salary: 0, payday: 1, base_savings: 0, current_savings: 0, enjoyment_fund: 0 };
 
-        // --- TIỆN ÍCH (UTILITIES) ---
-        window.formatMoney = (amount) => {
-            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
-        };
+    // --- TIỆN ÍCH ---
+    window.formatMoney = (a) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(a || 0);
+    window.parseCurrency = (s) => parseInt(s.toString().replace(/\D/g, '')) || 0;
+    window.formatCurrencyInput = (i) => {
+        let v = i.value.replace(/\D/g, '');
+        i.value = v ? new Intl.NumberFormat('vi-VN').format(v) : '';
+    };
 
-        window.parseCurrency = (str) => {
-            return parseInt(str.replace(/\D/g, '')) || 0;
-        };
-
-        window.formatCurrencyInput = (input) => {
-            let value = input.value.replace(/\D/g, '');
-            input.value = value ? new Intl.NumberFormat('vi-VN').format(value) : '';
-        };
-
-        // --- XỬ LÝ AUTH ---
-        async function handleAuth() {
-            const { data } = await supabase.auth.getSession();
-            if (data.session) {
-                user = data.session.user;
-                await setupListeners();
-            } else {
-                document.getElementById('loginSection').classList.remove('hidden');
-                document.getElementById('appSection').classList.add('hidden');
-            }
+    // --- AUTH ---
+    async function handleAuth() {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+            user = data.session.user;
+            await setupListeners();
+        } else {
+            document.getElementById('loginSection').classList.remove('hidden');
         }
+    }
+    window.signInWithGoogle = () => supabase.auth.signInWithOAuth({ provider: 'google' });
 
-        window.signInWithGoogle = async () => {
-            await supabase.auth.signInWithOAuth({ provider: 'google' });
-        };
-
-        // --- LOGIC NGÂN SÁCH & CSDL ---
-        async function setupListeners() {
-            if (!user) return;
-
-            try {
-                // 1. Lấy Settings
-                const { data: settingsData } = await supabase
-                    .from('settings')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .maybeSingle();
-
-                if (!settingsData) {
-                    document.getElementById('setupPrompt').classList.remove('hidden');
-                    document.getElementById('dashboard').classList.add('hidden');
-                    document.getElementById('appSection').classList.remove('hidden');
-                    document.getElementById('loginSection').classList.add('hidden');
-                    return;
-                }
-
-                settings = settingsData;
-                document.getElementById('dashboard').classList.remove('hidden');
-                document.getElementById('setupPrompt').classList.add('hidden');
-                document.getElementById('appSection').classList.remove('hidden');
-                document.getElementById('loginSection').classList.add('hidden');
-
-                // 2. Kiểm tra chu kỳ
-                const todayStr = new Date().toISOString().split('T')[0];
-                const { data: cycleData } = await supabase
-                    .from('monthly_cycles')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('is_closed', false)
-                    .lte('cycle_start', todayStr)
-                    .gte('cycle_end', todayStr)
-                    .maybeSingle();
-
-                if (!cycleData) {
-                    await generateNewCycle();
-                    return setupListeners(); // Gọi lại sau khi tạo xong
-                }
-
-                currentCycle = cycleData;
-
-                // 3. Lấy ngân sách ngày
-                const { data: budgetData } = await supabase
-                    .from('daily_budgets')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('budget_date', todayStr)
-                    .maybeSingle();
-                
-                todayBudget = budgetData;
-
-                // 4. Lấy các dữ liệu khác
-                const [exp, fix, gl] = await Promise.all([
-                    supabase.from('expenses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                    supabase.from('fixed_costs').select('*').eq('user_id', user.id),
-                    supabase.from('goals').select('*').eq('user_id', user.id)
-                ]);
-
-                expenses = exp.data || [];
-                fixedCosts = fix.data || [];
-                goals = gl.data || [];
-
-                updateUserDisplay();
-                updateUI();
-            } catch (error) {
-                console.error("Lỗi setup:", error);
-            }
-        }
-
-        async function generateNewCycle() {
-            const totalFixed = fixedCosts.reduce((s, f) => s + f.amount, 0);
-            const usableMoney = settings.salary - totalFixed - settings.base_savings;
-
-            const now = new Date();
-            const start = new Date(now.getFullYear(), now.getMonth(), settings.payday);
-            const end = new Date(start);
-            end.setMonth(end.getMonth() + 1);
-            end.setDate(end.getDate() - 1);
-
-            const { data: cycle, error: cErr } = await supabase
-                .from('monthly_cycles')
-                .upsert({
-                    user_id: user.id,
-                    cycle_start: start.toISOString().split('T')[0],
-                    cycle_end: end.toISOString().split('T')[0],
-                    total_income: settings.salary,
-                    total_fixed: totalFixed,
-                    total_savings: settings.base_savings,
-                    usable_money: usableMoney,
-                    remaining_money: usableMoney,
-                    is_closed: false
-                }, { onConflict: 'user_id, cycle_start' })
-                .select().single();
-
-            if (cErr) throw cErr;
-
-            const totalDays = Math.ceil((end - start) / 86400000) + 1;
-            const dailyAmount = Math.floor(usableMoney / totalDays);
-            const dailyEntries = [];
-
-            for (let i = 0; i < totalDays; i++) {
-                const d = new Date(start);
-                d.setDate(start.getDate() + i);
-                dailyEntries.push({
-                    user_id: user.id,
-                    cycle_id: cycle.id,
-                    budget_date: d.toISOString().split('T')[0],
-                    allocated: dailyAmount,
-                    remaining: dailyAmount,
-                    spent: 0
-                });
-            }
-
-            const { error: dErr } = await supabase
-                .from('daily_budgets')
-                .upsert(dailyEntries, { onConflict: 'user_id, budget_date' });
+    // --- DỮ LIỆU CHÍNH ---
+    async function setupListeners() {
+        if (!user) return;
+        try {
+            const { data: sData } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle();
+            if (!sData) return showSection('setupPrompt');
             
-            if (dErr) throw dErr;
-        }
+            settings = sData;
+            showSection('dashboard');
 
-        window.initBudget = async () => {
-            const salaryVal = window.parseCurrency(document.getElementById('salaryInput').value);
-            const savingsVal = window.parseCurrency(document.getElementById('savingsInput').value);
-            const enjoymentVal = window.parseCurrency(document.getElementById('enjoymentInput').value);
-            const paydayVal = parseInt(document.getElementById('paydayInput').value) || 1;
+            const todayStr = new Date().toISOString().split('T')[0];
+            const { data: cData } = await supabase.from('monthly_cycles').select('*').eq('user_id', user.id).eq('is_closed', false).lte('cycle_start', todayStr).gte('cycle_end', todayStr).maybeSingle();
 
-            const fixedCostsArr = [];
-            document.querySelectorAll('.fixed-cost-row').forEach(row => {
-                const name = row.querySelector('.fixed-name').value;
-                const amount = window.parseCurrency(row.querySelector('.fixed-amount').value);
-                if (name && amount) fixedCostsArr.push({ user_id: user.id, name, amount });
-            });
+            if (!cData) { await generateNewCycle(); return setupListeners(); }
+            currentCycle = cData;
 
-            try {
-                const { error: sErr } = await supabase.from('settings').upsert({
-                    user_id: user.id,
-                    salary: salaryVal,
-                    payday: paydayVal,
-                    base_savings: savingsVal,
-                    current_savings: savingsVal,
-                    enjoyment_fund: enjoymentVal,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
+            const { data: bData } = await supabase.from('daily_budgets').select('*').eq('user_id', user.id).eq('budget_date', todayStr).maybeSingle();
+            todayBudget = bData;
 
-                if (sErr) throw sErr;
+            const [exp, fix, gl] = await Promise.all([
+                supabase.from('expenses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+                supabase.from('fixed_costs').select('*').eq('user_id', user.id),
+                supabase.from('goals').select('*').eq('user_id', user.id)
+            ]);
 
-                await supabase.from('fixed_costs').delete().eq('user_id', user.id);
-                if (fixedCostsArr.length > 0) await supabase.from('fixed_costs').insert(fixedCostsArr);
+            expenses = exp.data || []; fixedCosts = fix.data || []; goals = gl.data || [];
+            updateUserDisplay(); updateUI();
+        } catch (e) { console.error(e); }
+    }
 
-                settings = { salary: salaryVal, payday: paydayVal, base_savings: savingsVal, current_savings: savingsVal, enjoyment_fund: enjoymentVal };
-                fixedCosts = fixedCostsArr;
+    async function generateNewCycle() {
+        const totalFixed = fixedCosts.reduce((s, f) => s + f.amount, 0);
+        const usable = settings.salary - totalFixed - settings.base_savings;
+        const now = new Date(), start = new Date(now.getFullYear(), now.getMonth(), settings.payday);
+        const end = new Date(start); end.setMonth(end.getMonth() + 1); end.setDate(end.getDate() - 1);
 
-                await generateNewCycle();
-                window.toggleConfigModal(false);
-                await setupListeners();
-                alert("Thiết lập thành công!");
-            } catch (e) { alert("Lỗi: " + e.message); }
-        };
+        const { data: cycle } = await supabase.from('monthly_cycles').upsert({
+            user_id: user.id, cycle_start: start.toISOString().split('T')[0], cycle_end: end.toISOString().split('T')[0],
+            total_income: settings.salary, total_fixed: totalFixed, total_savings: settings.base_savings,
+            usable_money: usable, remaining_money: usable, is_closed: false
+        }, { onConflict: 'user_id, cycle_start' }).select().single();
 
-        // --- UI & CHART ---
-        function updateUI() {
-            const totalFixed = fixedCosts.reduce((s, f) => s + f.amount, 0);
+        const diff = Math.ceil((end - start) / 86400000) + 1;
+        const daily = Math.floor(usable / diff);
+        const entries = Array.from({ length: diff }, (_, i) => {
+            const d = new Date(start); d.setDate(start.getDate() + i);
+            return { user_id: user.id, cycle_id: cycle.id, budget_date: d.toISOString().split('T')[0], allocated: daily, remaining: daily, spent: 0 };
+        });
+        await supabase.from('daily_budgets').upsert(entries, { onConflict: 'user_id, budget_date' });
+    }
+
+    // --- HÀNH ĐỘNG NGƯỜI DÙNG ---
+    window.addExpense = async () => {
+        const name = document.getElementById('expName').value;
+        const amount = window.parseCurrency(document.getElementById('expAmount').value);
+        if (!name || !amount || !todayBudget) return alert("Thiếu thông tin!");
+
+        try {
+            await supabase.from('expenses').insert({ user_id: user.id, daily_budget_id: todayBudget.id, name, amount, category: 'Chi tiêu' });
+            await supabase.from('daily_budgets').update({ spent: todayBudget.spent + amount, remaining: todayBudget.remaining - amount }).eq('id', todayBudget.id);
+            await supabase.from('monthly_cycles').update({ total_spent: (currentCycle.total_spent || 0) + amount, remaining_money: currentCycle.remaining_money - amount }).eq('id', currentCycle.id);
             
-            const safeSetText = (id, val) => {
-                const el = document.getElementById(id);
-                if (el) el.innerText = val;
-            };
+            document.getElementById('expName').value = ''; document.getElementById('expAmount').value = '';
+            await setupListeners();
+        } catch (e) { alert(e.message); }
+    };
 
-            safeSetText('salaryDisplay', window.formatMoney(settings.salary));
-            safeSetText('savingsDisplay', window.formatMoney(settings.current_savings));
-            safeSetText('fixedCostsDisplay', window.formatMoney(totalFixed));
-            safeSetText('todayBudgetText', window.formatMoney(todayBudget?.remaining || 0));
+    window.initBudget = async () => {
+        const salary = window.parseCurrency(document.getElementById('salaryInput').value);
+        const savings = window.parseCurrency(document.getElementById('savingsInput').value);
+        const enjoyment = window.parseCurrency(document.getElementById('enjoymentInput').value);
+        const payday = parseInt(document.getElementById('paydayInput').value) || 1;
+        const fixed = Array.from(document.querySelectorAll('.fixed-cost-row')).map(r => ({
+            user_id: user.id, name: r.querySelector('.fixed-name').value, amount: window.parseCurrency(r.querySelector('.fixed-amount').value)
+        })).filter(f => f.name && f.amount);
 
-            renderExpenses();
-            renderGoals();
-            updateChart(totalFixed);
-        }
+        try {
+            await supabase.from('settings').upsert({ user_id: user.id, salary, payday, base_savings: savings, current_savings: savings, enjoyment_fund: enjoyment }, { onConflict: 'user_id' });
+            await supabase.from('fixed_costs').delete().eq('user_id', user.id);
+            if (fixed.length) await supabase.from('fixed_costs').insert(fixed);
+            await generateNewCycle();
+            window.toggleConfigModal(false);
+            setupListeners();
+        } catch (e) { alert(e.message); }
+    };
 
-        function updateChart(totalFixed) {
-            const ctx = document.getElementById('mainChart').getContext('2d');
-            const spent = currentCycle?.total_spent || 0;
-            const remaining = currentCycle?.remaining_money || 0;
+    // --- CẬP NHẬT GIAO DIỆN ---
+    function updateUI() {
+        const fixed = fixedCosts.reduce((s, f) => s + f.amount, 0);
+        document.getElementById('salaryDisplay').innerText = window.formatMoney(settings.salary);
+        document.getElementById('savingsDisplay').innerText = window.formatMoney(settings.current_savings);
+        document.getElementById('todayBudgetText').innerText = window.formatMoney(todayBudget?.remaining || 0);
+        
+        document.getElementById('expenseList').innerHTML = expenses.slice(0, 5).map(e => `
+            <div class="flex justify-between items-center p-4 bg-white rounded-2xl border border-slate-50">
+                <div><p class="font-bold text-sm">${e.name}</p><p class="text-[9px] text-slate-400 uppercase font-black">${e.category}</p></div>
+                <p class="font-black text-rose-500 text-sm">-${window.formatMoney(e.amount)}</p>
+            </div>`).join('');
 
-            if (mainChart) mainChart.destroy();
+        document.getElementById('goalList').innerHTML = goals.map(g => {
+            const p = (g.current / g.target) * 100;
+            return `<div class="p-4 bg-indigo-50 rounded-2xl space-y-2">
+                <div class="flex justify-between text-[10px] font-bold"><span>${g.name}</span><span>${Math.round(p)}%</span></div>
+                <div class="h-1.5 bg-white rounded-full overflow-hidden"><div class="h-full bg-indigo-500" style="width:${p}%"></div></div>
+            </div>`;
+        }).join('');
+        updateChart(fixed);
+    }
 
-            mainChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Đã tiêu', 'Còn lại', 'Cố định', 'Tiết kiệm'],
-                    datasets: [{
-                        data: [spent, remaining, totalFixed, settings.base_savings],
-                        backgroundColor: ['#6366f1', '#e2e8f0', '#f43f5e', '#10b981'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { cutout: '80%', plugins: { legend: { display: false } } }
+    function updateChart(f) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (mainChart) mainChart.destroy();
+        mainChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: [currentCycle?.total_spent || 0, currentCycle?.remaining_money || 0, f, settings.base_savings],
+                    backgroundColor: ['#6366f1', '#e2e8f0', '#f43f5e', '#10b981'], borderWidth: 0
+                }]
+            },
+            options: { cutout: '75%', plugins: { legend: { display: false } } }
+        });
+    }
+
+    window.suggestFood = async () => {
+        const b = document.getElementById('suggestBtn'); b.innerText = "Đang nghĩ...";
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyGemini}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Gợi ý mâm cơm VN 3 món dưới 100k. Ngắn gọn." }] }] })
             });
-        }
+            const d = await res.json();
+            document.getElementById('aiChefContent').innerHTML = `<p class="text-xs italic text-slate-600">${d.candidates[0].content.parts[0].text}</p>`;
+        } catch (e) { console.error(e); } finally { b.innerText = "Gợi ý mâm cơm AI"; }
+    };
 
-        function renderExpenses() {
-            const container = document.getElementById('expenseList');
-            container.innerHTML = expenses.map(exp => `
-                <div class="flex justify-between items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-50">
-                    <div>
-                        <p class="font-bold text-slate-800">${exp.name}</p>
-                        <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest">${exp.category}</p>
-                    </div>
-                    <p class="font-black text-rose-500">-${window.formatMoney(exp.amount)}</p>
-                </div>
-            `).join('');
-        }
+    // --- UI HELPERS ---
+    function showSection(id) {
+        ['loginSection', 'setupPrompt', 'dashboard'].forEach(s => document.getElementById(s).classList.add('hidden'));
+        document.getElementById('appSection').classList.remove('hidden');
+        document.getElementById(id).classList.remove('hidden');
+    }
+    window.toggleConfigModal = (s) => document.getElementById('configModal').classList.toggle('hidden', !s);
+    window.addFixedCostRow = () => {
+        const d = document.createElement('div'); d.className = 'fixed-cost-row flex gap-2 mb-2';
+        d.innerHTML = `<input type="text" placeholder="Tên phí" class="fixed-name flex-1 p-3 bg-slate-50 rounded-xl text-xs outline-none"><input type="text" placeholder="Số tiền" oninput="window.formatCurrencyInput(this)" class="fixed-amount w-1/3 p-3 bg-slate-50 rounded-xl text-xs font-bold outline-none"><button onclick="this.parentElement.remove()" class="text-rose-500 px-2">✕</button>`;
+        document.getElementById('fixedCostsList').appendChild(d);
+    };
+    function updateUserDisplay() {
+        document.getElementById('userName').innerText = user.user_metadata.full_name || user.email;
+        if (user.user_metadata.avatar_url) document.getElementById('userAvatar').src = user.user_metadata.avatar_url;
+    }
 
-        function renderGoals() {
-            const container = document.getElementById('goalList');
-            container.innerHTML = goals.map(goal => {
-                const percent = Math.min((goal.current / goal.target) * 100, 100);
-                return `
-                <div class="p-4 bg-indigo-50 rounded-2xl space-y-2">
-                    <div class="flex justify-between text-xs font-bold">
-                        <span>${goal.name}</span>
-                        <span>${Math.round(percent)}%</span>
-                    </div>
-                    <div class="h-2 bg-white rounded-full overflow-hidden">
-                        <div class="h-full bg-indigo-500" style="width: ${percent}%"></div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        // --- AI CHEF (Sửa model gemini-1.5-flash) ---
-        window.suggestFood = async () => {
-            const btn = document.getElementById('suggestBtn');
-            btn.innerText = "Đang nghĩ...";
-            btn.disabled = true;
-
-            try {
-                const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyGemini}`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [{ text: "Gợi ý 1 thực đơn mâm cơm gia đình Việt Nam bình dân dưới 100k, gồm tên món và giá ước tính. Ngắn gọn." }]
-                            }]
-                        })
-                    }
-                );
-                const data = await response.json();
-                const text = data.candidates[0].content.parts[0].text;
-                document.getElementById('aiChefContent').innerHTML = `<p class="text-sm italic text-slate-600">${text}</p>`;
-            } catch (e) {
-                console.error(e);
-            } finally {
-                btn.innerText = "Gợi ý mâm cơm AI";
-                btn.disabled = false;
-            }
-        };
-
-        // --- MODAL & UI HELPERS ---
-        window.toggleConfigModal = (show) => {
-            document.getElementById('configModal').classList.toggle('hidden', !show);
-        };
-
-        window.addFixedCostRow = () => {
-            const container = document.getElementById('fixedCostsList');
-            const div = document.createElement('div');
-            div.className = 'fixed-cost-row flex gap-2 mb-2';
-            div.innerHTML = `
-                <input type="text" placeholder="Tên phí" class="fixed-name flex-1 p-3 bg-slate-50 rounded-xl outline-none text-sm">
-                <input type="text" placeholder="Số tiền" oninput="window.formatCurrencyInput(this)" class="fixed-amount w-1/3 p-3 bg-slate-50 rounded-xl outline-none text-sm font-bold">
-                <button onclick="this.parentElement.remove()" class="text-rose-500 px-2">✕</button>
-            `;
-            container.appendChild(div);
-        };
-
-        function updateUserDisplay() {
-            document.getElementById('userName').innerText = user.user_metadata.full_name || user.email;
-            if (user.user_metadata.avatar_url) {
-                document.getElementById('userAvatar').src = user.user_metadata.avatar_url;
-            }
-        }
-
-        // --- KHỞI CHẠY ---
-        handleAuth();
-    </script>
+    handleAuth();
+</script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -366,10 +204,9 @@
         .hidden { display: none; }
     </style>
 </head>
-
-<body class="bg-[#F8FAFC] text-slate-900 min-h-screen">
+<body class="bg-[#F8FAFC] pb-10">
     <div id="loginSection" class="hidden flex flex-col items-center justify-center min-h-screen p-6 text-center">
-        <div class="w-24 h-24 bg-indigo-600 rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-indigo-200 mb-8">
+        <div class="w-24 h-24 bg-indigo-600 rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-indigo-100 mb-8">
             <span class="text-4xl">💰</span>
         </div>
         <h1 class="text-3xl font-black tracking-tight mb-2">Finance Master</h1>
@@ -381,99 +218,123 @@
         </button>
     </div>
 
-    <div id="appSection" class="hidden pb-24">
-        <header class="p-6 flex justify-between items-center bg-white/80 backdrop-blur-md sticky top-0 z-30">
+    <div id="appSection" class="hidden max-w-md mx-auto min-h-screen">
+        <header class="p-6 flex justify-between items-center bg-[#F8FAFC]/80 backdrop-blur-md sticky top-0 z-30">
             <div class="flex items-center gap-3">
-                <img id="userAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky" class="w-12 h-12 rounded-2xl bg-indigo-50">
+                <img id="userAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky" class="w-12 h-12 rounded-2xl bg-white shadow-sm border border-slate-100">
                 <div>
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chào mừng</p>
                     <h2 id="userName" class="font-bold text-slate-800">Người dùng</h2>
                 </div>
             </div>
-            <button onclick="window.toggleConfigModal(true)" class="p-3 bg-slate-50 rounded-2xl text-slate-600">⚙️</button>
+            <button onclick="window.toggleConfigModal(true)" class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition-all">
+                ⚙️
+            </button>
         </header>
 
         <div id="setupPrompt" class="hidden p-6 text-center space-y-6">
             <div class="py-12 bg-white rounded-[3rem] shadow-sm border border-slate-100">
                 <div class="text-5xl mb-4">🚀</div>
-                <h3 class="text-xl font-bold px-8">Bắt đầu hành trình tài chính của bạn</h3>
-                <p class="text-slate-400 text-sm mt-2 px-8">Hãy thiết lập thu nhập và phí cố định để AI giúp bạn phân bổ chi tiêu.</p>
-                <button onclick="window.toggleConfigModal(true)" class="mt-8 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-indigo-100">Cấu hình ngay</button>
+                <h3 class="text-xl font-bold px-8">Bắt đầu hành trình tài chính</h3>
+                <p class="text-slate-400 text-sm mt-2 px-8">Thiết lập thu nhập để AI giúp bạn phân bổ chi tiêu hàng ngày.</p>
+                <button onclick="window.toggleConfigModal(true)" class="mt-8 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-indigo-100 active:scale-95 transition-all">
+                    Cấu hình ngay
+                </button>
             </div>
         </div>
 
         <div id="dashboard" class="hidden p-6 space-y-6">
-            <div class="relative bg-indigo-600 rounded-[3rem] p-8 text-white overflow-hidden shadow-2xl shadow-indigo-100">
-                <div class="relative z-10 space-y-6">
-                    <div class="flex justify-between items-start">
+            <div class="relative bg-indigo-600 rounded-[3rem] p-8 text-white overflow-hidden shadow-2xl shadow-indigo-200/50">
+                <div class="relative z-10 flex justify-between items-center">
+                    <div class="space-y-6">
                         <div>
                             <p class="text-indigo-100/80 text-[10px] font-black uppercase tracking-[0.2em]">Hôm nay bạn còn</p>
                             <h3 id="todayBudgetText" class="text-4xl font-black mt-1">0đ</h3>
                         </div>
-                        <div class="w-24 h-24">
-                            <canvas id="mainChart"></canvas>
+                        <div class="grid grid-cols-2 gap-4 pt-4 border-t border-indigo-500/30">
+                            <div>
+                                <p class="text-indigo-100/60 text-[10px] font-black uppercase tracking-widest">Thu nhập</p>
+                                <p id="salaryDisplay" class="font-bold text-sm">0đ</p>
+                            </div>
+                            <div>
+                                <p class="text-indigo-100/60 text-[10px] font-black uppercase tracking-widest">Tích lũy</p>
+                                <p id="savingsDisplay" class="font-bold text-sm text-emerald-300">0đ</p>
+                            </div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 pt-4 border-t border-indigo-500/30">
-                        <div>
-                            <p class="text-indigo-100/60 text-[10px] font-black uppercase tracking-widest">Thu nhập</p>
-                            <p id="salaryDisplay" class="font-bold">0đ</p>
-                        </div>
-                        <div>
-                            <p class="text-indigo-100/60 text-[10px] font-black uppercase tracking-widest">Tiết kiệm</p>
-                            <p id="savingsDisplay" class="font-bold text-emerald-300">0đ</p>
-                        </div>
+                    <div class="w-24 h-24 flex items-center justify-center bg-indigo-500/20 rounded-full">
+                        <canvas id="mainChart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-50">
-                <div class="flex items-center gap-3 mb-4">
-                    <span class="text-2xl">👨‍🍳</span>
-                    <h3 class="font-bold">AI Home Chef</h3>
+            <div class="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-50 space-y-4">
+                <div class="flex items-center justify-between px-2">
+                    <h3 class="font-bold text-slate-800">Ghi chép chi tiêu</h3>
+                    <span class="text-[10px] font-black text-indigo-500 uppercase">Hôm nay</span>
                 </div>
-                <div id="aiChefContent" class="mb-4 min-h-[50px] flex items-center justify-center">
-                    <p class="text-slate-400 text-sm italic">Hôm nay nấu gì cho tiết kiệm nhỉ?</p>
+                <div class="flex gap-2">
+                    <input type="text" id="expName" placeholder="Tên món (vd: Ăn trưa)" 
+                        class="flex-1 p-4 bg-slate-50 rounded-2xl outline-none text-sm border border-transparent focus:border-indigo-100 transition-all">
+                    <input type="text" id="expAmount" placeholder="Số tiền" oninput="window.formatCurrencyInput(this)" 
+                        class="w-1/3 p-4 bg-slate-50 rounded-2xl outline-none text-sm font-bold text-rose-500 border border-transparent focus:border-rose-100 transition-all">
+                </div>
+                <button onclick="window.addExpense()" 
+                    class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-indigo-100 active:scale-95 transition-all">
+                    Lưu chi tiêu
+                </button>
+            </div>
+
+            <div class="bg-orange-50 rounded-[2.5rem] p-6 border border-orange-100/50">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">👨‍🍳</div>
+                    <h3 class="font-bold text-orange-900">AI Home Chef</h3>
+                </div>
+                <div id="aiChefContent" class="mb-4 min-h-[60px] bg-white/50 rounded-2xl p-4 flex items-center justify-center">
+                    <p class="text-orange-700/70 text-xs italic text-center text-pretty">Nhấn để AI gợi ý mâm cơm tiết kiệm hôm nay!</p>
                 </div>
                 <button id="suggestBtn" onclick="window.suggestFood()" 
-                    class="w-full py-4 bg-orange-50 text-orange-600 rounded-2xl font-black text-sm active:scale-95 transition-all">
+                    class="w-full py-3 bg-orange-500 text-white rounded-xl font-black text-xs shadow-md shadow-orange-200 active:scale-95 transition-all">
                     Gợi ý mâm cơm AI
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 gap-6">
-                <div>
-                    <h3 class="font-black text-slate-800 mb-4 px-2">Chi tiêu gần đây</h3>
-                    <div id="expenseList" class="space-y-3"></div>
-                </div>
-                <div>
-                    <h3 class="font-black text-slate-800 mb-4 px-2">Mục tiêu tích lũy</h3>
-                    <div id="goalList" class="space-y-3"></div>
-                </div>
+            <div class="space-y-4">
+                <h3 class="font-black text-slate-800 px-2 text-sm uppercase tracking-widest">Chi tiêu gần đây</h3>
+                <div id="expenseList" class="space-y-3">
+                    </div>
+            </div>
+
+            <div class="space-y-4">
+                <h3 class="font-black text-slate-800 px-2 text-sm uppercase tracking-widest">Mục tiêu của bạn</h3>
+                <div id="goalList" class="space-y-3">
+                    </div>
             </div>
         </div>
     </div>
 
     <div id="configModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-        <div class="w-full max-w-lg bg-white rounded-[3rem] p-8 animate-in slide-in-from-bottom duration-300">
+        <div class="w-full max-w-lg bg-white rounded-[3rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
             <div class="flex justify-between items-center mb-8">
-                <h3 class="text-2xl font-black">Thiết lập tài chính</h3>
-                <button onclick="window.toggleConfigModal(false)" class="text-slate-400 text-2xl">✕</button>
+                <h3 class="text-2xl font-black tracking-tight">Thiết lập tài chính</h3>
+                <button onclick="window.toggleConfigModal(false)" class="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-400">✕</button>
             </div>
             
-            <div class="space-y-6 max-h-[60vh] overflow-y-auto px-1">
+            <div class="space-y-6 max-h-[60vh] overflow-y-auto px-1 custom-scrollbar">
                 <div class="grid grid-cols-1 gap-4">
                     <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thu nhập hàng tháng</label>
-                        <input type="text" id="salaryInput" oninput="window.formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng thu nhập tháng</label>
+                        <input type="text" id="salaryInput" oninput="window.formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold focus:bg-white focus:ring-2 ring-indigo-50 transition-all">
                     </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày nhận lương</label>
-                        <input type="number" id="paydayInput" min="1" max="31" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mục tiêu tiết kiệm</label>
-                        <input type="text" id="savingsInput" oninput="window.formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày lương</label>
+                            <input type="number" id="paydayInput" min="1" max="31" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tích lũy (VND)</label>
+                            <input type="text" id="savingsInput" oninput="window.formatCurrencyInput(this)" class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
+                        </div>
                     </div>
                     <div class="space-y-2">
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quỹ hưởng thụ</label>
@@ -481,17 +342,18 @@
                     </div>
                 </div>
 
-                <div class="space-y-4 pt-4 border-t border-slate-100">
+                <div class="space-y-4 pt-6 border-t border-slate-100">
                     <div class="flex justify-between items-center">
-                        <h4 class="font-bold text-sm">Khoản phí cố định</h4>
-                        <button onclick="window.addFixedCostRow()" class="text-indigo-600 text-sm font-bold">+ Thêm mới</button>
+                        <h4 class="font-bold text-sm">Khoản phí cố định hàng tháng</h4>
+                        <button onclick="window.addFixedCostRow()" class="text-indigo-600 text-xs font-black uppercase tracking-wider">+ Thêm phí</button>
                     </div>
-                    <div id="fixedCostsList"></div>
+                    <div id="fixedCostsList" class="space-y-2">
+                        </div>
                 </div>
             </div>
 
             <button onclick="window.initBudget()" class="w-full mt-8 bg-indigo-600 text-white py-5 rounded-[1.5rem] font-black shadow-lg shadow-indigo-100 active:scale-95 transition-all">
-                Xác nhận thiết lập
+                Lưu và Khởi tạo chu kỳ
             </button>
         </div>
     </div>
