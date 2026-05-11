@@ -9,406 +9,189 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/env.js"></script>
     <script type="module">
-        let chartInstance = null;
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-        window.showAnalytics = () => {
-            document.getElementById('analyticsSection').classList.remove('hidden');
-            window.filterStats('day'); // Mặc định xem theo ngày khi mở
-        };
+    const env = window.ENV || {};
+    const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
+    const apiKeyGemini = env.VITE_GEMINI_API_KEY;
 
-        window.closeAnalytics = () => {
-            document.getElementById('analyticsSection').classList.add('hidden');
-        };
+    let user = null, expenses = [], currentCycle = null, todayBudget = null, settings = {};
+    let chartInstance = null;
 
-        window.filterStats = async (type) => {
-            // 1. Cập nhật UI Nút bấm
-            const tabs = { day: 'btnDay', month: 'btnMonth', year: 'btnYear' };
-            Object.keys(tabs).forEach(k => {
-                const btn = document.getElementById(tabs[k]);
-                btn.className = k === type ? "flex-1 py-3 rounded-xl text-xs font-bold bg-white shadow-sm" : "flex-1 py-3 rounded-xl text-xs font-bold text-slate-500";
-            });
-
-            // 2. Lấy dữ liệu từ Supabase theo mốc thời gian
-            const now = new Date();
-            let startRange = new Date();
-            if (type === 'day') startRange.setHours(0, 0, 0, 0);
-            else if (type === 'month') startRange = new Date(now.getFullYear(), now.getMonth(), 1);
-            else startRange = new Date(now.getFullYear(), 0, 1);
-
-            const { data: list } = await supabase.from('expenses')
-                .select('*')
-                .eq('user_id', user.id)
-                .gte('created_at', startRange.toISOString())
-                .order('created_at', { ascending: false });
-
-            // 3. Hiển thị danh sách
-            const listContainer = document.getElementById('statsList');
-            listContainer.innerHTML = list.map(e => `
-        <div class="flex justify-between items-center p-5 bg-white rounded-3xl border border-slate-50">
-            <div>
-                <p class="font-bold text-sm text-slate-800">${e.name}</p>
-                <p class="text-[10px] text-slate-400 font-medium">${new Date(e.created_at).toLocaleDateString('vi-VN')}</p>
-            </div>
-            <p class="font-black text-rose-500 text-sm">-${window.formatMoney(e.amount)}</p>
-        </div>
-    `).join('');
-
-            // 4. Vẽ biểu đồ (Ví dụ theo danh mục)
-            updateAnalyticsChart(list);
-        };
-
-        function updateAnalyticsChart(data) {
-            const ctx = document.getElementById('analyticsChart').getContext('2d');
-            if (chartInstance) chartInstance.destroy();
-
-            const categories = {};
-            data.forEach(e => categories[e.category] = (categories[e.category] || 0) + e.amount);
-
-            chartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(categories),
-                    datasets: [{
-                        data: Object.values(categories),
-                        backgroundColor: ['#6366f1', '#10b981', '#f43f5e', '#f59e0b'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
-            });
-        }
-        let analyticsChart = null;
-
-        window.showAnalytics = async () => {
-            document.getElementById('analyticsModal').classList.remove('hidden');
-            window.filterStats('day'); // Mặc định mở ra là xem theo ngày
-        };
-
-        window.closeAnalytics = () => {
-            document.getElementById('analyticsModal').classList.add('hidden');
-        };
-
-        window.filterStats = async (mode) => {
-            if (!list || list.length === 0) {
-                if (analyticsChart) analyticsChart.destroy();
-                return;
-            }
-            // Update Tab UI
-            ['day', 'month', 'year'].forEach(m => {
-                const el = document.getElementById(`tab-${m}`);
-                el.className = m === mode ? "flex-1 py-2 rounded-xl text-xs font-bold bg-white shadow-sm" : "flex-1 py-2 rounded-xl text-xs font-bold text-slate-500";
-            });
-
-            const now = new Date();
-            let query = supabase.from('expenses').select('*').eq('user_id', user.id);
-            let label = "";
-
-            if (mode === 'day') {
-                const start = new Date(now.setHours(0, 0, 0, 0)).toISOString();
-                query = query.gte('created_at', start);
-                label = "Tổng chi tiêu hôm nay";
-            } else if (mode === 'month') {
-                const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-                query = query.gte('created_at', start);
-                label = `Tổng chi tiêu tháng ${now.getMonth() + 1}`;
-            } else {
-                const start = new Date(now.getFullYear(), 0, 1).toISOString();
-                query = query.gte('created_at', start);
-                label = `Tổng chi tiêu năm ${now.getFullYear()}`;
-            }
-
-            const { data: list } = await query.order('created_at', { ascending: false });
-            renderAnalytics(list, label);
-        };
-
-        function renderAnalytics(list, label) {
-            const total = list.reduce((s, e) => s + e.amount, 0);
-            document.getElementById('statsTotal').innerText = window.formatMoney(total);
-            document.getElementById('statsPeriod').innerText = label;
-
-            // Render List
-            const listEl = document.getElementById('statsList');
-            listEl.innerHTML = list.length > 0 ? list.map(e => `
-        <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
-            <div>
-                <p class="font-bold text-xs">${e.name}</p>
-                <p class="text-[9px] text-slate-400">${new Date(e.created_at).toLocaleDateString('vi-VN')}</p>
-            </div>
-            <p class="font-black text-rose-500 text-xs">-${window.formatMoney(e.amount)}</p>
-        </div>
-    `).join('') : '<p class="text-center text-slate-400 py-10">Không có dữ liệu</p>';
-
-            // Render Chart (Dựa trên category)
-            const cats = {};
-            list.forEach(e => cats[e.category] = (cats[e.category] || 0) + e.amount);
-
-            const ctx = document.getElementById('analyticsChart').getContext('2d');
-            if (analyticsChart) analyticsChart.destroy();
-            analyticsChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(cats),
-                    datasets: [{
-                        label: 'Số tiền',
-                        data: Object.values(cats),
-                        backgroundColor: '#6366f1',
-                        borderRadius: 10
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, display: false }, x: { grid: { display: false } } }
-                }
-            });
-        }
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
-
-        const env = window.ENV || {};
-        const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
-        const apiKeyGemini = env.VITE_GEMINI_API_KEY;
-
-        let user = null, expenses = [], goals = [], fixedCosts = [], currentCycle = null, todayBudget = null;
-        let settings = { salary: 0, payday: 1, base_savings: 0, current_savings: 0 };
-
-        window.formatMoney = (a) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(a || 0);
-        window.parseCurrency = (s) => parseInt(s.toString().replace(/\D/g, '')) || 0;
-        window.formatCurrencyInput = (i) => {
-            let v = i.value.replace(/\D/g, '');
-            i.value = v ? new Intl.NumberFormat('vi-VN').format(v) : '';
-        };
-
-        async function handleAuth() {
-            const { data } = await supabase.auth.getSession();
-            if (data.session) { user = data.session.user; await initApp(); }
-            else { document.getElementById('loginSection').classList.remove('hidden'); }
-        }
-
-        async function initApp() {
-            if (!user) return;
-            const { data: sData } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle();
-            if (!sData) return showSection('setupPrompt');
-            settings = sData;
-            await loadCycleData();
+    // --- KHỞI TẠO APP ---
+    async function initApp() {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+            user = data.session.user;
+            await loadAllData();
             showSection('dashboard');
+        } else {
+            document.getElementById('loginSection').classList.remove('hidden');
         }
+    }
 
-        async function loadCycleData() {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const { data: cData } = await supabase.from('monthly_cycles').select('*')
-                .eq('user_id', user.id).eq('is_closed', false)
-                .lte('cycle_start', todayStr).gte('cycle_end', todayStr).maybeSingle();
+    async function loadAllData() {
+        // 1. Lấy Settings
+        const { data: sData } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle();
+        if (!sData) return showSection('setupPrompt');
+        settings = sData;
 
-            if (!cData) { await generateNewCycle(); return loadCycleData(); }
-            currentCycle = cData;
+        // 2. Chốt ngày cũ nếu có (Chuyển dư vào tiết kiệm / Chia đều số âm)
+        await processPastDays();
 
-            const { data: bData } = await supabase.from('daily_budgets').select('*')
-                .eq('user_id', user.id).eq('budget_date', todayStr).maybeSingle();
-            todayBudget = bData;
+        // 3. Lấy chu kỳ và ngân sách hôm nay
+        const todayStr = new Date().toISOString().split('T')[0];
+        const { data: cData } = await supabase.from('monthly_cycles').select('*')
+            .eq('user_id', user.id).eq('is_closed', false)
+            .lte('cycle_start', todayStr).gte('cycle_end', todayStr).maybeSingle();
 
-            const [exp, fix, gl] = await Promise.all([
-                supabase.from('expenses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-                supabase.from('fixed_costs').select('*').eq('user_id', user.id),
-                supabase.from('goals').select('*').eq('user_id', user.id)
-            ]);
-            expenses = exp.data || []; fixedCosts = fix.data || []; goals = gl.data || [];
-            updateUI();
-        }
+        if (!cData) { await generateNewCycle(); return loadAllData(); }
+        currentCycle = cData;
 
-        // --- THUẬT TOÁN TỰ CÂN BẰNG KHI TIÊU ÂM ---
-        // --- THUẬT TOÁN TỰ CÂN BẰNG KHI TIÊU ÂM (Sửa lại) ---
-        async function balanceFutureDays(deficit) {
-            if (deficit >= 0) return;
+        const { data: bData } = await supabase.from('daily_budgets').select('*')
+            .eq('user_id', user.id).eq('budget_date', todayStr).maybeSingle();
+        todayBudget = bData;
 
-            const todayStr = new Date().toISOString().split('T')[0];
-            const { data: futureDays } = await supabase.from('daily_budgets')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('cycle_id', currentCycle.id)
-                .gt('budget_date', todayStr)
-                .eq('is_processed', false)
-                .order('budget_date', { ascending: true });
+        // 4. Lấy danh sách chi tiêu
+        const { data: eData } = await supabase.from('expenses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10);
+        expenses = eData || [];
 
-            if (futureDays && futureDays.length > 0) {
-                const reduceAmount = Math.floor(Math.abs(deficit) / futureDays.length);
-                for (let day of futureDays) {
-                    await supabase.from('daily_budgets').update({
-                        allocated: day.allocated - reduceAmount,
-                        remaining: day.remaining - reduceAmount
-                    }).eq('id', day.id);
+        updateUI();
+    }
+
+    // --- THUẬT TOÁN CHỐT NGÀY ---
+    async function processPastDays() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const { data: pastDays } = await supabase.from('daily_budgets')
+            .select('*').eq('user_id', user.id).lt('budget_date', todayStr).eq('is_processed', false);
+
+        if (pastDays && pastDays.length > 0) {
+            for (let day of pastDays) {
+                if (day.remaining > 0) {
+                    // Dư tiền -> Cộng vào hũ tiết kiệm (Database: current_savings)
+                    const newSavings = settings.current_savings + day.remaining;
+                    await supabase.from('settings').update({ current_savings: newSavings }).eq('user_id', user.id);
+                    settings.current_savings = newSavings;
+                } else if (day.remaining < 0) {
+                    // Âm tiền -> Chia đều cho các ngày còn lại trong chu kỳ
+                    await redistributeDeficit(day.remaining, day.budget_date);
                 }
-                // Đánh dấu ngày hôm nay đã xử lý xong khoản âm
-                await supabase.from('daily_budgets').update({ remaining: 0, is_processed: true }).eq('id', todayBudget.id);
+                await supabase.from('daily_budgets').update({ is_processed: true }).eq('id', day.id);
             }
         }
+    }
 
-        // --- HÀM XỬ LÝ KHI QUA NGÀY MỚI (Thêm vào) ---
-        async function checkAndHandleEndOfDay() {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const { data: pastDays } = await supabase.from('daily_budgets')
-                .select('*')
-                .eq('user_id', user.id)
-                .lt('budget_date', todayStr)
-                .eq('is_processed', false);
-
-            if (pastDays && pastDays.length > 0) {
-                for (let day of pastDays) {
-                    if (day.remaining > 0) {
-                        // Dư tiền -> Cộng vào hũ tiết kiệm
-                        const newSavings = settings.current_savings + day.remaining;
-                        await supabase.from('settings').update({ current_savings: newSavings }).eq('user_id', user.id);
-                        settings.current_savings = newSavings;
-                    } else if (day.remaining < 0) {
-                        // Âm tiền (nếu addExpense chưa xử lý kịp) -> Chia đều
-                        await balanceFutureDays(day.remaining);
-                    }
-                    await supabase.from('daily_budgets').update({ is_processed: true }).eq('id', day.id);
-                }
+    async function redistributeDeficit(deficit, fromDate) {
+        const { data: futureDays } = await supabase.from('daily_budgets')
+            .select('*').eq('user_id', user.id).gt('budget_date', fromDate).eq('is_processed', false);
+        
+        if (futureDays && futureDays.length > 0) {
+            const split = Math.floor(deficit / futureDays.length);
+            for (let d of futureDays) {
+                await supabase.from('daily_budgets').update({ 
+                    allocated: d.allocated + split, 
+                    remaining: d.remaining + split 
+                }).eq('id', d.id);
             }
         }
+    }
 
-        // --- CẬP NHẬT ADD EXPENSE ĐỂ HIỆN SỐ ÂM ---
-        window.addExpense = async () => {
-            const name = document.getElementById('expName').value;
-            const amount = window.parseCurrency(document.getElementById('expAmount').value);
-            if (!name || !amount) return;
+    // --- NHẬP CHI TIÊU (FIX LỖI KHÔNG HIỆN SỐ ÂM) ---
+    window.addExpense = async () => {
+        const name = document.getElementById('expName').value;
+        const amount = window.parseCurrency(document.getElementById('expAmount').value);
+        if (!name || !amount) return;
 
-            try {
-                const newRemaining = todayBudget.remaining - amount;
+        const newRemaining = todayBudget.remaining - amount;
 
-                // Cập nhật UI ngay lập tức để thấy số âm
-                document.getElementById('todayBudgetText').innerText = window.formatMoney(newRemaining);
-                if (newRemaining < 0) document.getElementById('todayBudgetText').classList.add('text-rose-500');
+        // Lưu Database trước
+        await supabase.from('expenses').insert({
+            user_id: user.id, daily_budget_id: todayBudget.id,
+            name, amount, category: 'Chi tiêu', expense_date: new Date().toISOString().split('T')[0]
+        });
 
-                await supabase.from('expenses').insert({
-                    user_id: user.id,
-                    daily_budget_id: todayBudget.id,
-                    name,
-                    amount,
-                    category: 'Chi tiêu',
-                    created_at: new Date().toISOString() // Đảm bảo có timestamp cho thống kê
-                });
+        await supabase.from('daily_budgets').update({
+            spent: todayBudget.spent + amount,
+            remaining: newRemaining
+        }).eq('id', todayBudget.id);
 
-                await supabase.from('daily_budgets').update({
-                    spent: todayBudget.spent + amount,
-                    remaining: newRemaining
-                }).eq('id', todayBudget.id);
+        // Hiển thị ngay lập tức kể cả âm
+        todayBudget.remaining = newRemaining;
+        updateUI();
 
-                if (newRemaining < 0) {
-                    await balanceFutureDays(newRemaining);
-                }
+        document.getElementById('expName').value = ''; 
+        document.getElementById('expAmount').value = '';
+    };
 
-                await loadCycleData(); // Load lại để đồng bộ mọi thứ
-            } catch (e) { console.error(e); }
-        };
-        window.addExpense = async () => {
-            const name = document.getElementById('expName').value;
-            const amount = window.parseCurrency(document.getElementById('expAmount').value);
-            if (!name || !amount) return alert("Vui lòng nhập đủ!");
+    // --- THỐNG KÊ (FIX LỖI KHÔNG SỬ DỤNG ĐƯỢC) ---
+    window.showAnalytics = () => {
+        document.getElementById('analyticsSection').classList.remove('hidden');
+        window.filterStats('day');
+    };
 
-            try {
-                // 1. Lưu khoản chi
-                await supabase.from('expenses').insert({ user_id: user.id, daily_budget_id: todayBudget.id, name, amount, category: 'Chi tiêu' });
+    window.filterStats = async (mode) => {
+        const now = new Date();
+        let start = new Date();
+        if(mode === 'day') start.setHours(0,0,0,0);
+        else if(mode === 'month') start = new Date(now.getFullYear(), now.getMonth(), 1);
+        else start = new Date(now.getFullYear(), 0, 1);
 
-                // 2. Tính toán số dư mới
-                const newSpent = todayBudget.spent + amount;
-                const newRemaining = todayBudget.remaining - amount;
+        const { data: list } = await supabase.from('expenses')
+            .select('*').eq('user_id', user.id)
+            .gte('expense_date', start.toISOString().split('T')[0]);
 
-                // 3. Cập nhật database
-                await supabase.from('daily_budgets').update({ spent: newSpent, remaining: newRemaining }).eq('id', todayBudget.id);
-                await supabase.from('monthly_cycles').update({
-                    total_spent: (currentCycle.total_spent || 0) + amount,
-                    remaining_money: currentCycle.remaining_money - amount
-                }).eq('id', currentCycle.id);
+        const total = list.reduce((s, e) => s + e.amount, 0);
+        document.getElementById('statsTotal').innerText = window.formatMoney(total);
 
-                // 4. Nếu âm tiền, thực hiện chia đều khoản âm cho tương lai
-                if (newRemaining < 0) {
-                    await balanceFutureDays(newRemaining);
-                }
+        // Vẽ biểu đồ
+        const cats = {};
+        list.forEach(e => cats[e.category] = (cats[e.category] || 0) + e.amount);
+        
+        const ctx = document.getElementById('analyticsChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(cats),
+                datasets: [{ data: Object.values(cats), backgroundColor: ['#6366f1', '#10b981', '#f43f5e'] }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    };
 
-                document.getElementById('expName').value = '';
-                document.getElementById('expAmount').value = '';
-                await loadCycleData();
-            } catch (e) { alert(e.message); }
-        };
-
-        window.deleteExpense = async (id, amount) => {
-            if (!confirm("Xóa khoản chi này?")) return;
-            await supabase.from('expenses').delete().eq('id', id);
-            // Khi xóa, chúng ta cộng lại tiền vào ngân sách ngày (không cần logic balance ngược lại để tránh phức tạp)
-            await supabase.from('daily_budgets').update({
-                spent: todayBudget.spent - amount,
-                remaining: todayBudget.remaining + amount
-            }).eq('id', todayBudget.id);
-            await loadCycleData();
-        };
-
-        // --- CHỐT THÁNG (Gom toàn bộ tiền dư vào tiết kiệm) ---
-        window.closeCycleEarly = async () => {
-            const msg = "Bạn muốn chốt chu kỳ này? Toàn bộ số tiền còn dư trong tháng sẽ được chuyển vào hũ tiết kiệm.";
-            if (!confirm(msg)) return;
-
-            const remainingInCycle = currentCycle.remaining_money;
-            const newSavings = settings.current_savings + (remainingInCycle > 0 ? remainingInCycle : 0);
-
-            await supabase.from('settings').update({ current_savings: newSavings }).eq('user_id', user.id);
-            await supabase.from('monthly_cycles').update({ is_closed: true }).eq('id', currentCycle.id);
-
-            alert("Đã chốt chu kỳ. Tiết kiệm hiện tại: " + window.formatMoney(newSavings));
-            location.reload();
-        };
-
-        async function generateNewCycle() {
-            const totalFixed = fixedCosts.reduce((s, f) => s + f.amount, 0);
-            const usable = settings.salary - totalFixed - settings.base_savings;
-            const now = new Date();
-            let start = new Date(now.getFullYear(), now.getMonth(), settings.payday);
-            if (start > now) start.setMonth(start.getMonth() - 1);
-
-            let end = new Date(start);
-            end.setMonth(end.getMonth() + 1);
-            end.setDate(end.getDate() - 1);
-
-            const { data: cycle } = await supabase.from('monthly_cycles').upsert({
-                user_id: user.id, cycle_start: start.toISOString().split('T')[0], cycle_end: end.toISOString().split('T')[0],
-                total_income: settings.salary, total_fixed: totalFixed, total_savings: settings.base_savings,
-                usable_money: usable, remaining_money: usable, is_closed: false
-            }, { onConflict: 'user_id, cycle_start' }).select().single();
-
-            const diff = Math.ceil((end - start) / 86400000) + 1;
-            const daily = Math.floor(usable / diff);
-            const entries = Array.from({ length: diff }, (_, i) => {
-                const d = new Date(start); d.setDate(start.getDate() + i);
-                return { user_id: user.id, cycle_id: cycle.id, budget_date: d.toISOString().split('T')[0], allocated: daily, remaining: daily, spent: 0 };
-            });
-            await supabase.from('daily_budgets').upsert(entries, { onConflict: 'user_id, budget_date' });
+    // --- UI HELPERS ---
+    function updateUI() {
+        const remainEl = document.getElementById('todayBudgetText');
+        remainEl.innerText = window.formatMoney(todayBudget?.remaining || 0);
+        
+        // Fix: Nếu âm thì đổi màu đỏ
+        if (todayBudget?.remaining < 0) {
+            remainEl.classList.add('text-rose-400');
+            remainEl.classList.remove('text-white');
+        } else {
+            remainEl.classList.remove('text-rose-400');
+            remainEl.classList.add('text-white');
         }
 
-        function updateUI() {
-            document.getElementById('salaryDisplay').innerText = window.formatMoney(settings.salary);
-            document.getElementById('savingsDisplay').innerText = window.formatMoney(settings.current_savings);
-            const remainEl = document.getElementById('todayBudgetText');
-            remainEl.innerText = window.formatMoney(todayBudget?.remaining || 0);
-            remainEl.className = (todayBudget?.remaining < 0) ? "text-4xl font-black mt-1 text-rose-400" : "text-4xl font-black mt-1 text-white";
-
-            document.getElementById('expenseList').innerHTML = expenses.slice(0, 10).map(e => `
-            <div class="flex justify-between items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-50">
-                <div><p class="font-bold text-sm">${e.name}</p><p class="text-[9px] text-slate-400 uppercase font-black">${new Date(e.created_at).toLocaleTimeString()}</p></div>
-                <div class="flex items-center gap-3">
-                    <p class="font-black text-rose-500 text-sm">-${window.formatMoney(e.amount)}</p>
-                    <button onclick="window.deleteExpense('${e.id}', ${e.amount})" class="text-slate-300">✕</button>
-                </div>
+        document.getElementById('savingsDisplay').innerText = window.formatMoney(settings.current_savings);
+        
+        document.getElementById('expenseList').innerHTML = expenses.map(e => `
+            <div class="flex justify-between items-center p-4 bg-white rounded-2xl shadow-sm">
+                <div><p class="font-bold text-sm">${e.name}</p></div>
+                <p class="font-black text-rose-500 text-sm">-${window.formatMoney(e.amount)}</p>
             </div>`).join('');
-        }
+    }
 
-        window.toggleConfigModal = (s) => document.getElementById('configModal').classList.toggle('hidden', !s);
-        function showSection(id) {
-            document.querySelectorAll('#loginSection, #setupPrompt, #dashboard').forEach(s => s.classList.add('hidden'));
-            document.getElementById('appSection').classList.remove('hidden');
-            document.getElementById(id).classList.remove('hidden');
-        }
+    window.closeAnalytics = () => document.getElementById('analyticsSection').classList.add('hidden');
+    window.formatMoney = (a) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(a || 0);
+    window.parseCurrency = (s) => parseInt(s.toString().replace(/\D/g, '')) || 0;
+    window.formatCurrencyInput = (i) => {
+        let v = i.value.replace(/\D/g, '');
+        i.value = v ? new Intl.NumberFormat('vi-VN').format(v) : '';
+    };
 
-        handleAuth();
-    </script>
+    initApp();
+</script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
