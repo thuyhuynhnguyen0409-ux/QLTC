@@ -199,7 +199,7 @@
             end.setMonth(end.getMonth() + 1);
             end.setDate(end.getDate() - 1);
 
-            // 1. Lưu hoặc cập nhật Chu kỳ (Monthly Cycle)
+            // 1. Lưu/Cập nhật Monthly Cycle
             const { data: cycle, error: cycleError } = await supabase
                 .from('monthly_cycles')
                 .upsert({
@@ -212,13 +212,12 @@
                     usable_money: usableMoney,
                     remaining_money: usableMoney,
                     is_closed: false
-                }, { onConflict: 'user_id, cycle_start' }) // Tránh trùng lặp chu kỳ
-                .select()
-                .single();
+                }, { onConflict: 'user_id, cycle_start' }) // Khớp với constraint unique_user_cycle_start
+                .select().single();
 
             if (cycleError) throw cycleError;
 
-            // 2. Chuẩn bị dữ liệu ngân sách hàng ngày
+            // 2. Tạo dữ liệu hàng ngày
             const totalDays = Math.ceil((end - start) / 86400000) + 1;
             const dailyAmount = Math.floor(usableMoney / totalDays);
             const dailyEntries = [];
@@ -236,17 +235,13 @@
                 });
             }
 
-            // 3. Sử dụng upsert để giải quyết lỗi "duplicate key"
+            // 3. Lưu/Cập nhật Daily Budgets
             const { error: dailyError } = await supabase
                 .from('daily_budgets')
-                .upsert(dailyEntries, { onConflict: 'user_id, budget_date' });
+                .upsert(dailyEntries, { onConflict: 'user_id, budget_date' }); // Khớp với constraint unique_user_budget_date
 
-            if (dailyError) {
-                console.error("Lỗi khi lưu ngân sách ngày:", dailyError);
-                throw dailyError;
-            }
-        }
-        async function recalculateSavings(
+            if (dailyError) throw dailyError;
+        } async function recalculateSavings(
             budget
         ) {
 
@@ -450,7 +445,7 @@
             });
 
             try {
-                // Cập nhật settings (Khớp hoàn toàn với bảng public.settings)
+                // Lưu hoặc cập nhật Settings
                 const { error: settingsError } = await supabase
                     .from('settings')
                     .upsert({
@@ -458,14 +453,14 @@
                         salary: salaryVal,
                         payday: paydayVal,
                         base_savings: savingsVal,
-                        current_savings: savingsVal, // Khởi tạo tích lũy bằng mức tiết kiệm cơ sở
+                        current_savings: savingsVal,
                         enjoyment_fund: enjoymentVal,
                         updated_at: new Date().toISOString()
-                    });
+                    }, { onConflict: 'user_id' }); // Sử dụng constraint unique_user_settings
 
                 if (settingsError) throw settingsError;
 
-                // Cập nhật phí cố định (Bảng public.fixed_costs)
+                // Xóa và chèn lại phí cố định
                 await supabase.from('fixed_costs').delete().eq('user_id', user.id);
                 if (fixedCostsArr.length > 0) {
                     await supabase.from('fixed_costs').insert(fixedCostsArr);
@@ -473,24 +468,22 @@
 
                 // Cập nhật biến local để app dùng ngay
                 settings = { salary: salaryVal, payday: paydayVal, base_savings: savingsVal, current_savings: savingsVal, enjoyment_fund: enjoymentVal };
+                fixedCosts = fixedCostsArr;
 
-                // Tạo chu kỳ mới (Quan trọng để có data cho Dashboard)
                 await generateNewCycle();
-
                 window.toggleConfigModal(false);
-                await setupListeners();
+                await setupListeners(); // Tải lại toàn bộ dashboard
+
                 alert("Thiết lập thành công!");
             } catch (error) {
-                console.error("Lỗi:", error);
-                alert("Lỗi: " + error.message);
+                alert("Lỗi thiết lập: " + error.message);
             }
-        }; window.addFixedCostRow = (name = '', amount = '') => {
-            const container = document.getElementById('fixedCostsList');
+        }; const container = document.getElementById('fixedCostsList');
 
-            const div = document.createElement('div');
-            div.className = 'fixed-cost-row flex gap-2 mb-3';
+        const div = document.createElement('div');
+        div.className = 'fixed-cost-row flex gap-2 mb-3';
 
-            div.innerHTML = `
+        div.innerHTML = `
             <input
                 type="text"
                 class="fixed-name flex-1 p-3 bg-slate-50 rounded-xl"
@@ -507,83 +500,65 @@
             >
         `;
 
-            container.appendChild(div);
-        };
+        container.appendChild(div);
 
         // --- SUPABASE LOGIC ---
         async function setupListeners() {
             if (!user) return;
 
             try {
-                // 1. Tải cấu hình tài chính (Settings) trước
-                const { data: settingsData, error: sError } = await supabase
+                const { data: settingsData } = await supabase
                     .from('settings')
                     .select('*')
                     .eq('user_id', user.id)
-                    .single();
+                    .maybeSingle();
 
-                if (sError && sError.code !== 'PGRST116') throw sError; // PGRST116 là lỗi không tìm thấy data (chưa setup)
-
-                if (settingsData) {
-                    settings = settingsData;
-                    document.getElementById('dashboard')?.classList.remove('hidden');
-                    document.getElementById('setupPrompt')?.classList.add('hidden');
-                } else {
+                if (!settingsData) {
                     document.getElementById('setupPrompt')?.classList.remove('hidden');
                     document.getElementById('dashboard')?.classList.add('hidden');
-                    return; // Dừng lại nếu chưa có settings
+                    return;
                 }
 
-                // 2. Sau khi có settings, kiểm tra Chu kỳ (Cycle)
+                settings = settingsData;
+                document.getElementById('dashboard')?.classList.remove('hidden');
+                document.getElementById('setupPrompt')?.classList.add('hidden');
+
                 const today = new Date().toISOString().split('T')[0];
-                const { data: cycleData, error: cError } = await supabase
+                const { data: cycleData } = await supabase
                     .from('monthly_cycles')
                     .select('*')
                     .eq('user_id', user.id)
                     .eq('is_closed', false)
                     .lte('cycle_start', today)
                     .gte('cycle_end', today)
-                    .maybeSingle(); // Dùng maybeSingle để tránh báo lỗi nếu chưa có cycle
+                    .maybeSingle();
 
                 if (!cycleData) {
-                    // Nếu chưa có chu kỳ cho tháng này, tạo mới dựa trên settings
                     await generateNewCycle();
-                    // Sau khi tạo xong thì gọi lại hàm để lấy data mới nhất
+                    // Quay lại hàm để lấy dữ liệu vừa tạo
                     return setupListeners();
                 }
 
                 currentCycle = cycleData;
 
-                // 3. Lấy ngân sách ngày hôm nay (Daily Budget)
-                const { data: budgetData } = await supabase
-                    .from('daily_budgets')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('budget_date', today)
-                    .maybeSingle();
-
-                todayBudget = budgetData;
-
-                // 4. Tải các dữ liệu bổ trợ (Chi tiêu, phí cố định, mục tiêu)
-                const [expensesRes, fixedRes, goalsRes] = await Promise.all([
+                // Tải các bảng khác
+                const [exp, fix, gl] = await Promise.all([
                     supabase.from('expenses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
                     supabase.from('fixed_costs').select('*').eq('user_id', user.id),
                     supabase.from('goals').select('*').eq('user_id', user.id)
                 ]);
 
-                expenses = expensesRes.data || [];
-                fixedCosts = fixedRes.data || [];
-                goals = goalsRes.data || [];
+                expenses = exp.data || [];
+                fixedCosts = fix.data || [];
+                goals = gl.data || [];
 
-                // 5. Cập nhật giao diện
                 updateUserDisplay();
                 updateUI();
 
             } catch (error) {
-                console.error("Lỗi setupListeners:", error);
+                console.error("Lỗi đồng bộ:", error);
             }
-        }
-        // AI Suggestion
+        } // AI Suggestion
         window.suggestFood = async () => {
             const btn = document.getElementById('btnSuggest');
             const chefText = document.getElementById('aiChefText');
