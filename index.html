@@ -442,7 +442,7 @@ let settings = {
 
             // reload
 
-            await setupListeners();
+            await setupListeners()
 
             document.getElementById('expName').value = '';
             document.getElementById('expAmount').value = '';
@@ -476,85 +476,68 @@ let settings = {
             setupListeners();
         };
 
-        window.initBudget = async () => {
-            const salary = window.parseCurrency(
-                document.getElementById('salaryInput').value
-            );
+       window.initBudget = async () => {
+    // 1. Lấy dữ liệu từ Input
+    const salaryVal = window.parseCurrency(document.getElementById('salaryInput').value);
+    const savingsVal = window.parseCurrency(document.getElementById('savingsInput').value);
+    const enjoymentVal = window.parseCurrency(document.getElementById('enjoymentInput').value);
+    const paydayVal = parseInt(document.getElementById('paydayInput').value) || 1;
 
-            const savings = window.parseCurrency(
-                document.getElementById('savingsInput').value
-            );
+    // 2. Thu thập danh sách phí cố định
+    const fixedCostsArr = [];
+    document.querySelectorAll('.fixed-cost-row').forEach(row => {
+        const name = row.querySelector('.fixed-name').value;
+        const amount = window.parseCurrency(row.querySelector('.fixed-amount').value);
+        if (name && amount) {
+            fixedCostsArr.push({ user_id: user.id, name, amount });
+        }
+    });
 
-            const enjoyment = window.parseCurrency(
-                document.getElementById('enjoymentInput').value
-            );
-
-            const fixedCosts = [];
-
-            document.querySelectorAll('.fixed-cost-row').forEach(row => {
-                const name = row.querySelector('.fixed-name').value;
-                const amount = window.parseCurrency(
-                    row.querySelector('.fixed-amount').value
-                );
-
-                if (name && amount) {
-                    fixedCosts.push({ name, amount });
-                }
+    try {
+        // 3. Cập nhật settings vào Supabase
+        const { error: settingsError } = await supabase
+            .from('settings')
+            .upsert({
+                user_id: user.id,
+                salary: salaryVal,
+                payday: paydayVal,
+                base_savings: savingsVal,
+                current_savings: savingsVal,
+                enjoyment_fund: enjoymentVal
             });
 
-            const payday =
-                parseInt(
-                    document.getElementById('paydayInput').value
-                ) || 1;
+        if (settingsError) throw settingsError;
 
-            const { error } = await supabase
-                .from('settings')
-                .upsert({
-                    user_id: user.id,
+        // 4. Xóa và cập nhật lại phí cố định
+        await supabase.from('fixed_costs').delete().eq('user_id', user.id);
+        if (fixedCostsArr.length > 0) {
+            await supabase.from('fixed_costs').insert(fixedCostsArr);
+        }
 
-                    salary,
-
-                    payday,
-
-                    base_savings: savings,
-
-                    current_savings: savings,
-
-                    enjoyment_fund: enjoyment
-                });
-
-            if (error) {
-                console.error(error);
-                alert('Lỗi lưu cấu hình');
-                return;
-            }
-            // xoá phí cũ
-
-            await supabase
-                .from('fixed_costs')
-                .delete()
-                .eq('user_id', user.id);
-
-            // insert phí mới
-
-            if (fixedCosts.length) {
-
-                await supabase
-                    .from('fixed_costs')
-                    .insert(
-                        fixedCosts.map(f => ({
-                            user_id: user.id,
-                            name: f.name,
-                            amount: f.amount
-                        }))
-                    );
-            }
-            await generateNewCycle();
-            window.toggleConfigModal(false);
-
-            setupListeners();
+        // 5. Cập nhật biến local để UI đồng bộ ngay lập tức
+        settings = {
+            salary: salaryVal,
+            payday: paydayVal,
+            base_savings: savingsVal,
+            current_savings: savingsVal,
+            enjoyment_fund: enjoymentVal
         };
+        fixedCosts = fixedCostsArr;
 
+        // 6. Tạo chu kỳ mới (Cycle)
+        await generateNewCycle();
+        
+        // 7. Đóng modal và tải lại dữ liệu
+        window.toggleConfigModal(false);
+        await setupListeners();
+        
+        alert("Thiết lập thành công!");
+
+    } catch (error) {
+        console.error("Lỗi khi thiết lập:", error);
+        alert("Có lỗi xảy ra: " + error.message);
+    }
+};
         window.addFixedCostRow = (name = '', amount = '') => {
             const container = document.getElementById('fixedCostsList');
 
