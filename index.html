@@ -27,13 +27,13 @@
         let user = null;
         let expenses = [];
         let goals = [];
-        let settings = {
-            salary,
-            payday,
-            base_savings: savings,
-            current_savings: savings,
-            enjoyment_fund: enjoyment
-        };
+let settings = {
+    salary: 0,
+    payday: 1,
+    base_savings: 0,
+    current_savings: 0,
+    enjoyment_fund: 0
+};
 
         let fixedCosts = [];
 
@@ -703,13 +703,11 @@
                                 parts: [{
                                     text:
                                         `Gợi ý 1 mâm cơm Việt Nam gồm:
-- món mặn
-- món canh
-- món rau/xào
+- tầm 2-3 món tùy theo ngân sách
 
 Ngân sách: ${dailyVal} VNĐ
 Yêu cầu: ${note}
-Giá cả nguyên liệu chính xác theo giá mới nhất thị trường.
+Giá cả trung bình nguyên liệu
 Hướng dẫn cách làm món ăn ngắn gọn
 Trả lời ngắn gọn.`
                                 }]
@@ -745,12 +743,18 @@ Trả lời ngắn gọn.`
 
         // --- UI UPDATES ---
         function updateUI() {
-            const totalFixed =
-                fixedCosts.reduce(
-                    (s, f) => s + f.amount,
-                    0
-                );
-            const now = new Date();
+          const totalFixed = fixedCosts.reduce((s, f) => s + f.amount, 0);
+    const now = new Date();
+
+    // Đổi config -> settings
+    const safeSetText = (id, text) => { 
+        const el = document.getElementById(id);
+        if (el) el.innerText = text; 
+    };
+
+    safeSetText('salaryDisplay', window.formatMoney(settings.salary));
+    safeSetText('savingsDisplay', window.formatMoney(settings.current_savings));
+    safeSetText('fixedCostsDisplay', window.formatMoney(totalFixed));
 
             const filteredExpenses = expenses.filter(e => {
                 const d = new Date(e.created_at);
@@ -773,7 +777,6 @@ Trả lời ngắn gọn.`
                 currentCycle?.remaining_money || 0;
 
             // Update DOM elements
-            const safeSetText = (id, text) => { if (document.getElementById(id)) document.getElementById(id).innerText = text; };
 
             const dailyEl =
                 document.getElementById('dailyVal');
