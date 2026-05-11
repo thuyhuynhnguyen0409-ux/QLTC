@@ -215,8 +215,9 @@
         }
 
         // --- THUẬT TOÁN TỰ CÂN BẰNG KHI TIÊU ÂM ---
+        // --- THUẬT TOÁN TỰ CÂN BẰNG KHI TIÊU ÂM (Sửa lại) ---
         async function balanceFutureDays(deficit) {
-            if (deficit >= 0) return; // Chỉ xử lý khi bị âm
+            if (deficit >= 0) return;
 
             const todayStr = new Date().toISOString().split('T')[0];
             const { data: futureDays } = await supabase.from('daily_budgets')
@@ -224,6 +225,7 @@
                 .eq('user_id', user.id)
                 .eq('cycle_id', currentCycle.id)
                 .gt('budget_date', todayStr)
+                .eq('is_processed', false)
                 .order('budget_date', { ascending: true });
 
             if (futureDays && futureDays.length > 0) {
@@ -234,11 +236,70 @@
                         remaining: day.remaining - reduceAmount
                     }).eq('id', day.id);
                 }
-                // Sau khi trừ các ngày tương lai, đưa remaining ngày hôm nay về 0 để reset trạng thái âm
-                await supabase.from('daily_budgets').update({ remaining: 0 }).eq('id', todayBudget.id);
+                // Đánh dấu ngày hôm nay đã xử lý xong khoản âm
+                await supabase.from('daily_budgets').update({ remaining: 0, is_processed: true }).eq('id', todayBudget.id);
             }
         }
 
+        // --- HÀM XỬ LÝ KHI QUA NGÀY MỚI (Thêm vào) ---
+        async function checkAndHandleEndOfDay() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const { data: pastDays } = await supabase.from('daily_budgets')
+                .select('*')
+                .eq('user_id', user.id)
+                .lt('budget_date', todayStr)
+                .eq('is_processed', false);
+
+            if (pastDays && pastDays.length > 0) {
+                for (let day of pastDays) {
+                    if (day.remaining > 0) {
+                        // Dư tiền -> Cộng vào hũ tiết kiệm
+                        const newSavings = settings.current_savings + day.remaining;
+                        await supabase.from('settings').update({ current_savings: newSavings }).eq('user_id', user.id);
+                        settings.current_savings = newSavings;
+                    } else if (day.remaining < 0) {
+                        // Âm tiền (nếu addExpense chưa xử lý kịp) -> Chia đều
+                        await balanceFutureDays(day.remaining);
+                    }
+                    await supabase.from('daily_budgets').update({ is_processed: true }).eq('id', day.id);
+                }
+            }
+        }
+
+        // --- CẬP NHẬT ADD EXPENSE ĐỂ HIỆN SỐ ÂM ---
+        window.addExpense = async () => {
+            const name = document.getElementById('expName').value;
+            const amount = window.parseCurrency(document.getElementById('expAmount').value);
+            if (!name || !amount) return;
+
+            try {
+                const newRemaining = todayBudget.remaining - amount;
+
+                // Cập nhật UI ngay lập tức để thấy số âm
+                document.getElementById('todayBudgetText').innerText = window.formatMoney(newRemaining);
+                if (newRemaining < 0) document.getElementById('todayBudgetText').classList.add('text-rose-500');
+
+                await supabase.from('expenses').insert({
+                    user_id: user.id,
+                    daily_budget_id: todayBudget.id,
+                    name,
+                    amount,
+                    category: 'Chi tiêu',
+                    created_at: new Date().toISOString() // Đảm bảo có timestamp cho thống kê
+                });
+
+                await supabase.from('daily_budgets').update({
+                    spent: todayBudget.spent + amount,
+                    remaining: newRemaining
+                }).eq('id', todayBudget.id);
+
+                if (newRemaining < 0) {
+                    await balanceFutureDays(newRemaining);
+                }
+
+                await loadCycleData(); // Load lại để đồng bộ mọi thứ
+            } catch (e) { console.error(e); }
+        };
         window.addExpense = async () => {
             const name = document.getElementById('expName').value;
             const amount = window.parseCurrency(document.getElementById('expAmount').value);
