@@ -23,10 +23,31 @@ export async function logout() {
 }
 
 export async function checkAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        window.location.href = './auth.html';
-        return null;
+
+    // đợi Supabase restore session
+
+    await new Promise(resolve =>
+        setTimeout(resolve, 1000)
+    )
+
+    const {
+        data: { session },
+        error
+    } =
+        await supabase.auth.getSession()
+
+    if (error) {
+        console.error(error)
     }
-    return session.user;
+
+    if (!session?.user) {
+
+        window.location.replace(
+            './auth.html'
+        )
+
+        return null
+    }
+
+    return session.user
 }
