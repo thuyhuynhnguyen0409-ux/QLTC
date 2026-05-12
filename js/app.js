@@ -3,30 +3,27 @@ import { checkAuth, logout } from './auth.js';
 import { loadSettings } from './settings.js';
 import { loadTodayBudget } from './budget.js';
 import { updateHomeUI } from './ui.js';
+// Import thêm addExpense nếu bạn có file đó
+// import { addExpense } from './expenses.js'; 
 
-// Gán hàm vào window để HTML có thể gọi được qua onclick
+// Gán vào window để gọi được từ HTML
 window.logout = logout;
 window.toggleConfigModal = (show) => {
-    const modal = document.getElementById('configModal');
-    if (show) modal.classList.remove('hidden');
-    else modal.classList.add('hidden');
+    document.getElementById('configModal').classList.toggle('hidden', !show);
 };
 
+// Khởi tạo app
 async function init() {
     const user = await checkAuth();
     if (!user) return;
 
-    // Hiển thị email user ngay lập tức
-    const emailDisplay = document.getElementById('userEmailDisplay');
-    if (emailDisplay) emailDisplay.innerText = user.email;
-
-    try {
-        await loadSettings();
-        await loadTodayBudget();
-        updateHomeUI();
-    } catch (error) {
-        console.error("Lỗi khởi tạo dữ liệu:", error);
+    if (document.getElementById('userEmailDisplay')) {
+        document.getElementById('userEmailDisplay').innerText = user.email;
     }
+
+    await loadSettings();
+    await loadTodayBudget();
+    updateHomeUI();
 }
 
 init();

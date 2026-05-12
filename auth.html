@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Finance AI Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-slate-950 min-h-screen flex items-center justify-center p-5">
     <div class="bg-slate-900 w-full max-w-md p-8 rounded-[30px] shadow-2xl border border-slate-800">
         <div class="text-center mb-8">
@@ -16,33 +18,41 @@
         <div class="space-y-4">
             <div>
                 <label class="text-sm text-slate-300 font-bold">Email</label>
-                <input id="email" type="email" placeholder="you@gmail.com" class="w-full mt-2 p-4 rounded-2xl bg-slate-800 border border-slate-700 text-white outline-none" />
+                <input id="email" type="email" placeholder="you@gmail.com"
+                    class="w-full mt-2 p-4 rounded-2xl bg-slate-800 border border-slate-700 text-white outline-none" />
             </div>
-            <button id="loginBtn" class="w-full bg-indigo-500 hover:bg-indigo-600 transition text-white font-black p-4 rounded-2xl text-lg">
+            <button id="loginBtn"
+                class="w-full bg-indigo-500 hover:bg-indigo-600 transition text-white font-black p-4 rounded-2xl text-lg">
                 Gửi link đăng nhập
             </button>
         </div>
     </div>
 
     <script type="module">
-        import { loginWithEmail } from './js/auth.js'; 
+        import { loginWithEmail } from '/js/auth.js';
 
         document.getElementById('loginBtn').addEventListener('click', async () => {
-            const email = document.getElementById('email').value.trim();
-            if (!email) {
-                alert('Vui lòng nhập email');
-                return;
-            }
-            // Thêm hiệu ứng loading để biết là nút đã được bấm
-            const btn = document.getElementById('loginBtn');
+        const email = document.getElementById('email').value.trim();
+        if (!email) {
+            alert('Vui lòng nhập email');
+            return;
+        }
+
+        const btn = document.getElementById('loginBtn');
+        const originalText = btn.innerText;
+        
+        try {
             btn.innerText = 'Đang gửi...';
             btn.disabled = true;
-            
             await loginWithEmail(email);
-            
-            btn.innerText = 'Gửi link đăng nhập';
+        } catch (err) {
+            console.error(err);
+        } finally {
+            btn.innerText = originalText;
             btn.disabled = false;
-        });
+        }
+    });
     </script>
 </body>
+
 </html>

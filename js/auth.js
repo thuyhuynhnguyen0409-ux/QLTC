@@ -2,21 +2,19 @@
 import { supabase } from './supabase.js'; // Vì cùng nằm trong thư mục js/
 
 export async function loginWithEmail(email) {
-    try {
-        const { error } = await supabase.auth.signInWithOtp({
-            email,
-            options: {
-                // Đảm bảo URL này đã được thêm vào Redirect URLs trong Supabase Dashboard
-                emailRedirectTo: window.location.origin + '/index.html'
-            }
-        });
+    const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+            // Đảm bảo đường dẫn này khớp với URL Production của bạn
+            emailRedirectTo: window.location.origin + '/index.html'
+        }
+    });
 
-        if (error) throw error;
-        alert('Đã gửi link đăng nhập thành công! Vui lòng kiểm tra hộp thư đến (hoặc Spam).');
-    } catch (err) {
-        console.error("Lỗi đăng nhập:", err);
-        alert('Lỗi: ' + err.message);
+    if (error) {
+        alert('Lỗi: ' + error.message);
+        return;
     }
+    alert('Đã gửi link đăng nhập thành công! Hãy kiểm tra Email của bạn.');
 }
 
 export async function logout() {
