@@ -83,7 +83,9 @@ import {
 from './stats.js'
 
 const monthly =
-    getMonthlyData(expenses)
+    getMonthlyData(
+    state.expenses
+)
 
 new Chart(
     document.getElementById(

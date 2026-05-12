@@ -5,33 +5,70 @@ import {
 from './auth.js'
 
 import {
+    loadSettings
+}
+from './settings.js'
+
+import {
+    loadTodayBudget
+}
+from './budget.js'
+
+import {
+    updateHomeUI
+}
+from './ui.js'
+
+import {
     addExpense,
-    renderExpenseList
+    transferSavingsToBudget
 }
 from './expenses.js'
 
 import {
-    transferSavingsToBudget
+    suggestFood
 }
-from './savings.js'
+from './ai.js'
 
 import {
     closeDay
 }
 from './day.js'
 
+import * as state
+from './state.js'
+
+// GLOBAL FUNCTIONS
+
 window.logout = logout
 
-window.transferSavingsToBudget =
-    transferSavingsToBudget
+window.suggestFood =
+suggestFood
 
 window.closeDay =
-    closeDay
+closeDay
+
+window.transferSavingsToBudget =
+transferSavingsToBudget
+
+window.toggleConfigModal =
+(show) => {
+
+    document
+    .getElementById(
+        'configModal'
+    )
+    .classList.toggle(
+        'hidden',
+        !show
+    )
+}
 
 window.addExpense =
-async function () {
+async () => {
 
     const name =
+
         document
         .getElementById(
             'expName'
@@ -39,6 +76,7 @@ async function () {
         .value
 
     const amount =
+
         document
         .getElementById(
             'expAmount'
@@ -46,6 +84,7 @@ async function () {
         .value
 
     const category =
+
         document
         .getElementById(
             'expCategory'
@@ -67,48 +106,13 @@ async function init() {
     if (!user)
         return
 
-    renderExpenseList()
+    state.setUser(user)
+
+    await loadSettings()
+
+    loadTodayBudget()
+
+    updateHomeUI()
 }
-window.addFixedCostRow =
-function () {
 
-    const box =
-        document.getElementById(
-            'fixedCostsList'
-        )
-
-    const div =
-        document.createElement(
-            'div'
-        )
-
-    div.className =
-        'flex gap-2'
-
-    div.innerHTML = `
-
-    <input
-        class="fixed-name flex-1 p-3 border rounded-2xl"
-        placeholder="Tên phí"
-    />
-
-    <input
-        class="fixed-amount w-32 p-3 border rounded-2xl"
-        placeholder="Số tiền"
-    />
-
-    <button
-        class="bg-red-500 text-white px-4 rounded-2xl del-fixed"
-    >
-        X
-    </button>
-    `
-
-    box.appendChild(div)
-
-    div
-    .querySelector('.del-fixed')
-    .onclick = () =>
-        div.remove()
-}
 init()
