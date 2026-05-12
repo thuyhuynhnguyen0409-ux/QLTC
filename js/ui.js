@@ -23,3 +23,15 @@ export async function rebalanceFutureBudget(overSpent) {
         overSpent
     )
 }
+window.toggleConfigModal = function(show) {
+
+    const modal =
+        document.getElementById('configModal')
+
+    if (!modal) return
+
+    modal.classList.toggle(
+        'hidden',
+        !show
+    )
+}

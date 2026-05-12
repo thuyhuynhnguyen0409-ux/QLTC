@@ -302,7 +302,16 @@ Finance AI
 </div>
 
 </div>
-
+<script>
+if (
+    !localStorage.getItem(
+        'supabase.auth.token'
+    )
+) {
+    window.location.href =
+        './auth.html'
+}
+</script>
 <script
     type="module"
     src="./js/app.js"

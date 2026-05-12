@@ -1,33 +1,82 @@
-import {
-    checkAuth
-} from './auth.js'
+
+import { checkAuth, logout }
+from './auth.js'
 
 import {
-    loadSettings
-} from './settings.js'
+    loadSettings,
+    toggleConfigModal,
+    initBudget,
+    addFixedCostRow
+}
+from './settings.js'
 
 import {
     loadTodayBudget
-} from './budget.js'
+}
+from './budget.js'
 
 import {
     updateHomeUI
-} from './ui.js'
-import { requireAuth } from './authGuard.js'
+}
+from './ui.js'
 
-const user = await requireAuth()
+import {
+    addExpense
+}
+from './expenses.js'
+
+import {
+    suggestFood
+}
+from './ai.js'
+
+import {
+    loadExpenses
+}
+from './expenses.js'
+
 async function init() {
 
-    const loggedIn =
+    const user =
         await checkAuth()
 
-    if (!loggedIn) return
+    if (!user) return
 
     await loadSettings()
 
     await loadTodayBudget()
 
+    await loadExpenses()
+
     updateHomeUI()
+
+    const emailEl =
+        document.getElementById(
+            'userEmailDisplay'
+        )
+
+    if (emailEl) {
+
+        emailEl.innerText =
+            user.email
+    }
 }
+
+window.logout = logout
+
+window.addExpense =
+    addExpense
+
+window.toggleConfigModal =
+    toggleConfigModal
+
+window.initBudget =
+    initBudget
+
+window.addFixedCostRow =
+    addFixedCostRow
+
+window.suggestFood =
+    suggestFood
 
 init()
