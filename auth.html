@@ -1,284 +1,69 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đăng Nhập Hệ Thống</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/env.js"></script>
-    <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .login-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 1.5rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            width: 100%;
-            max-width: 400px;
-            padding: 2.5rem;
-        }
-        .btn-social {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            transition: all 0.2s;
-            margin-bottom: 1rem;
-            cursor: pointer;
-        }
-        .btn-email { background-color: #f3f4f6; color: #1f2937; }
-        .btn-email:hover { background-color: #e5e7eb; }
-        .btn-facebook { background-color: #1877f2; color: white; }
-        .btn-facebook:hover { background-color: #166fe5; box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3); }
-        
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #6366f1;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+/>
+
+<title>
+Đăng nhập
+</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
 </head>
-<body>
 
-    <div class="login-card mx-4">
-        <div class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">Chào mừng</h1>
-            <p class="text-gray-500">Vui lòng chọn phương thức đăng nhập</p>
-        </div>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen">
 
-        <!-- Khối chọn phương thức -->
-        <div id="auth-methods">
-            <button onclick="showEmailInput()" class="btn-social btn-email">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/>
-                </svg>
-                <span>Đăng nhập với Email</span>
-            </button>
+<div class="bg-white p-8 rounded-3xl w-full max-w-sm">
 
-            <button onclick="handleLogin('google')" class="btn-social btn-google" style="background: #fff; color:#444; border:1px solid #ddd;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 533.5 544.3">
-                    <path fill="#4285F4" d="M533.5 278.4c0-17.4-1.6-34.1-4.7-50.4H272v95.5h146.9c-6.3 34.5-25.1 63.7-53.8 83.3v69.3h86.9c50.8-46.8 80.5-115.8 80.5-197.7z"/>
-                    <path fill="#34A853" d="M272 544.3c72.6 0 133.6-24 178.2-65.1l-86.9-69.3c-24.2 16.2-55 25.7-91.3 25.7-70.1 0-129.5-47.3-150.8-111l-89.6 69.6c44.4 88 136.3 150.1 240.4 150.1z"/>
-                    <path fill="#FBBC05" d="M121.2 325.5c-10.7-31.7-10.7-65.9 0-97.6l-89.6-69.6C12.3 214.2 0 247.8 0 281.5s12.3 67.3 31.6 122.2l89.6-69.6z"/>
-                    <path fill="#EA4335" d="M272 109.8c39.4 0 74.7 13.6 102.6 40.5l77-77C391.4 24.5 334.3 0 272 0 167.9 0 76 62.1 31.6 150.1l89.6 69.6C142.5 157.1 201.9 109.8 272 109.8z"/>
-                </svg>
-                <span>Đăng nhập với Google</span>
-            </button>
+<h1 class="text-3xl font-black mb-6">
+Đăng nhập
+</h1>
 
-            <button onclick="handleLogin('facebook')" class="btn-social btn-facebook">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951z"/>
-                </svg>
-                <span>Tiếp tục với Facebook</span>
-            </button>
-        </div>
+<button
+    id="googleBtn"
+    class="w-full bg-black text-white p-4 rounded-2xl"
+>
+Đăng nhập Google
+</button>
 
-        <!-- Khối nhập Email (Ẩn mặc định) -->
-        <div id="email-form" class="hidden space-y-4">
-            <input type="email" id="email-input" placeholder="ten@email.com" 
-                class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-400 outline-none transition-all">
-            <button onclick="handleLogin('email')" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all">
-                Gửi mã xác nhận (OTP)
-            </button>
-            <button onclick="hideEmailInput()" class="w-full text-sm text-gray-400 hover:text-gray-600 transition-all">
-                Quay lại
-            </button>
-        </div>
+</div>
 
-        <!-- Trạng thái chờ -->
-        <div id="status-container" class="hidden flex flex-col items-center mt-6">
-            <div class="loader mb-3"></div>
-            <p id="status-text" class="text-sm text-gray-600 font-medium text-center"></p>
-        </div>
+<script type="module">
 
-        <!-- Thông báo lỗi -->
-        <div id="error-display" class="hidden mt-4 p-3 bg-red-50 text-red-500 text-xs rounded-lg text-center font-medium"></div>
+import { createClient }
+from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-        <div class="mt-8 text-center">
-            <p class="text-[10px] text-gray-400 uppercase tracking-widest font-bold">
-                Dự án Quản lý Chi tiêu & AI Meal
-            </p>
-        </div>
-    </div>
+const supabase =
+    createClient(
+        'YOUR_SUPABASE_URL',
+        'YOUR_SUPABASE_ANON_KEY'
+    )
 
-    <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+document
+.getElementById('googleBtn')
+.addEventListener('click', async () => {
 
-        const env = window.ENV || {};
-        const SUPABASE_URL = env.VITE_SUPABASE_URL || 'https://mojulicyvkrwoxbjpsem.supabase.co';
-        const SUPABASE_KEY = env.VITE_SUPABASE_ANON_KEY || '';
-        
-        const supabaseClient = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: {
-                persistSession: true,
-                autoRefreshToken: true,
-                detectSessionInUrl: true
-            }
-        }) : null;
+    await supabase.auth.signInWithOAuth({
 
-        if (!supabaseClient) {
-            console.error('Thiếu Supabase ENV. Vui lòng cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.');
-            const errorDisplay = document.getElementById('error-display');
-            if (errorDisplay) {
-                errorDisplay.classList.remove('hidden');
-                errorDisplay.innerText = 'Thiếu Supabase ENV. Vui lòng cấu hình VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY.';
-            }
+        provider: 'google',
+
+        options: {
+
+            redirectTo:
+                window.location.origin
+                + '/index.html'
         }
+    })
+})
 
-        // Gán các hàm vào window để gọi được từ HTML
-        window.showEmailInput = () => {
-            document.getElementById('auth-methods').classList.add('hidden');
-            document.getElementById('email-form').classList.remove('hidden');
-            document.getElementById('error-display').classList.add('hidden');
-        };
+</script>
 
-        window.hideEmailInput = () => {
-            document.getElementById('auth-methods').classList.remove('hidden');
-            document.getElementById('email-form').classList.add('hidden');
-        };
-
-        window.handleLogin = async (provider) => {
-            const statusContainer = document.getElementById('status-container');
-            const statusText = document.getElementById('status-text');
-            const errorDisplay = document.getElementById('error-display');
-            const emailForm = document.getElementById('email-form');
-            const authMethods = document.getElementById('auth-methods');
-
-            if (!supabaseClient) {
-                if (errorDisplay) {
-                    errorDisplay.classList.remove('hidden');
-                    errorDisplay.innerText = 'Supabase chưa được cấu hình. Vui lòng kiểm tra biến môi trường.';
-                }
-                return;
-            }
-
-            errorDisplay.classList.add('hidden');
-            
-            try {
-                if (provider === 'facebook' || provider === 'google') {
-                    authMethods.classList.add('hidden');
-                    statusContainer.classList.remove('hidden');
-                    statusText.innerText = provider === 'google' ? "Đang kết nối Google..." : "Đang kết nối Facebook...";
-
-                    const { error } = await supabaseClient.auth.signInWithOAuth({
-                        provider: provider,
-                        options: { redirectTo: window.location.origin + '/auth.html' }
-                    });
-                    if (error) throw error;
-
-                } else if (provider === 'email') {
-                    const email = document.getElementById('email-input').value;
-                    if (!email) throw new Error("Vui lòng nhập địa chỉ Email");
-
-                    emailForm.classList.add('hidden');
-                    statusContainer.classList.remove('hidden');
-                    statusText.innerText = "Đang gửi yêu cầu xác thực...";
-
-                    const { error } = await supabaseClient.auth.signInWithOtp({
-                        email: email,
-                        options: { emailRedirectTo: window.location.origin + '/auth.html' }
-                    });
-                    if (error) throw error;
-
-                    statusContainer.innerHTML = `
-                        <div class="text-green-500 mb-2 text-2xl">📧</div>
-                        <p class="text-sm text-gray-700 font-bold">Thành công!</p>
-                        <p class="text-xs text-gray-500 text-center mt-1 px-4">Kiểm tra hộp thư đến của bạn để lấy đường dẫn đăng nhập.</p>
-                        <p class="text-xs text-gray-500 text-center mt-1 px-4">Sau khi click link, bạn sẽ được đưa về trang chủ.</p>
-                        <button onclick="location.reload()" class="mt-4 text-xs text-indigo-500 underline">Trở lại</button>
-                    `;
-                }
-            } catch (error) {
-                console.error(error);
-                statusContainer.classList.add('hidden');
-                if (provider === 'email') emailForm.classList.remove('hidden');
-                else authMethods.classList.remove('hidden');
-                
-                errorDisplay.innerText = error?.message || 'Đã có lỗi xảy ra. Vui lòng thử lại.';
-                errorDisplay.classList.remove('hidden');
-            }
-        };
-
-        const parseHashToken = () => {
-            const hash = window.location.hash.replace(/^#/, '');
-            if (!hash) return null;
-            const params = new URLSearchParams(hash);
-            const access_token = params.get('access_token');
-            const refresh_token = params.get('refresh_token');
-            if (!access_token || !refresh_token) return null;
-            return { access_token, refresh_token };
-        };
-
-        const restoreSessionFromHash = async () => {
-            const tokens = parseHashToken();
-            if (!tokens || !supabaseClient || typeof supabaseClient.auth.setSession !== 'function') return null;
-            const { data, error } = await supabaseClient.auth.setSession(tokens);
-            if (error) {
-                console.warn('Không thể phục hồi session từ callback hash trên auth.html:', error.message);
-                return null;
-            }
-            window.history.replaceState(null, '', window.location.pathname);
-            return data.session?.user ?? null;
-        };
-
-        async function redirectIfSignedIn() {
-            if (!supabaseClient) return;
-            console.log('auth.html load URL=', window.location.href);
-            const { data: { session }, error } = await supabaseClient.auth.getSession();
-            console.log('auth.html current session=', session, error);
-
-            if (session?.user) {
-                console.log('auth.html redirecting to index.html');
-                window.location.href = window.location.origin + '/index.html';
-            }
-        }
-
-        // Kiểm tra phiên đăng nhập hiện tại
-        window.onload = async () => {
-            try {
-                const restoredUser = await restoreSessionFromHash();
-                if (restoredUser) {
-                    console.log('auth.html restored session from hash:', restoredUser);
-                    window.location.href = window.location.origin + '/index.html';
-                    return;
-                }
-
-                const urlParams = new URLSearchParams(window.location.search);
-                const oauthError = urlParams.get('error');
-                const oauthDesc = urlParams.get('error_description');
-                if (oauthError) {
-                    document.getElementById('error-display').classList.remove('hidden');
-                    document.getElementById('error-display').innerText = `OAuth lỗi: ${oauthError}` + (oauthDesc ? `\n${oauthDesc}` : '');
-                    console.warn('OAuth callback error on auth.html:', oauthError, oauthDesc);
-                }
-
-                await redirectIfSignedIn();
-            } catch (error) {
-                console.error('Lỗi khi kiểm tra session trên auth.html:', error);
-            }
-
-            if (!supabaseClient) return;
-            supabaseClient.auth.onAuthStateChange((event, session) => {
-                if (session?.user) {
-                    window.location.href = window.location.origin + '/index.html';
-                }
-            });
-        };
-    </script>
 </body>
 </html>

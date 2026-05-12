@@ -16,7 +16,10 @@ import {
 
 async function init() {
 
-    await checkAuth()
+    const loggedIn =
+        await checkAuth()
+
+    if (!loggedIn) return
 
     await loadSettings()
 

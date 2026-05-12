@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+
+<meta charset="UTF-8" />
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+/>
+
+<title>
+Thống kê - Finance AI
+</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<link
+    rel="stylesheet"
+    href="./css/style.css"
+/>
+
+</head>
+
+<body class="bg-slate-100 min-h-screen">
+
+<div class="max-w-md mx-auto p-4">
+
+    <!-- HEADER -->
+
+    <div class="flex justify-between items-center mb-5">
+
+        <div>
+
+            <h1 class="text-3xl font-black">
+                Thống kê
+            </h1>
+
+            <p class="text-slate-500 text-sm">
+                Lịch sử chi tiêu
+            </p>
+
+        </div>
+
+        <a
+            href="./index.html"
+            class="bg-indigo-500 text-white px-4 py-2 rounded-2xl text-sm font-bold"
+        >
+            Trang chủ
+        </a>
+
+    </div>
+
+    <!-- OVERVIEW -->
+
+    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
+
+        <div class="grid grid-cols-2 gap-4">
+
+            <div>
+
+                <p class="text-slate-500 text-sm">
+                    Tổng chi tiêu
+                </p>
+
+                <h2
+                    id="totalSpent"
+                    class="text-2xl font-black text-rose-500 mt-1"
+                >
+                    0đ
+                </h2>
+
+            </div>
+
+            <div>
+
+                <p class="text-slate-500 text-sm">
+                    Số giao dịch
+                </p>
+
+                <h2
+                    id="totalExpenses"
+                    class="text-2xl font-black mt-1"
+                >
+                    0
+                </h2>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- FILTER -->
+
+    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
+
+        <div class="grid grid-cols-2 gap-3">
+
+            <select
+                id="monthFilter"
+                class="p-3 border rounded-2xl"
+            >
+
+                <option value="">
+                    Tất cả tháng
+                </option>
+
+            </select>
+
+            <select
+                id="yearFilter"
+                class="p-3 border rounded-2xl"
+            >
+
+                <option value="">
+                    Tất cả năm
+                </option>
+
+            </select>
+
+        </div>
+
+        <button
+            id="applyFilterBtn"
+            class="w-full bg-indigo-500 text-white p-3 rounded-2xl mt-4 font-bold"
+        >
+            Lọc thống kê
+        </button>
+
+    </div>
+
+    <!-- CHART -->
+
+    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
+
+        <h3 class="font-bold text-lg mb-4">
+            Biểu đồ chi tiêu
+        </h3>
+
+        <canvas id="statsChart"></canvas>
+
+    </div>
+
+    <!-- CATEGORY -->
+
+    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
+
+        <h3 class="font-bold text-lg mb-4">
+            Theo danh mục
+        </h3>
+
+        <div id="categoryStats"></div>
+
+    </div>
+
+    <!-- HISTORY -->
+
+    <div class="bg-white p-5 rounded-3xl shadow-sm">
+
+        <h3 class="font-bold text-lg mb-4">
+            Lịch sử giao dịch
+        </h3>
+
+        <div id="historyList"></div>
+
+    </div>
+
+</div>
+
+<script type="module">
+
+import { supabase } from './js/supabase.js'
+import { formatMoney } from './js/utils.js'
+
+let user = null
+let expenses = []
+
+const categories = {
+    food: 'Ăn uống',
+    transport: 'Di chuyển',
+    shopping: 'Mua sắm',
+    bills: 'Hóa đơn',
+    other: 'Khác'
+}
+
+async function init() {
+
+    const {
+        data: { session }
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+
+        window.location.href = './auth.html'
+        return
+    }
+
+    user = session.user
+
+    await loadExpenses()
+
+    renderFilters()
+
+    renderStats(expenses)
+
+    document
+        .getElementById('applyFilterBtn')
+        .addEventListener(
+            'click',
+            applyFilters
+        )
+}
+
+async function loadExpenses() {
+
+    const { data } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .order('expense_date', {
+            ascending: false
+        })
+
+    expenses = data || []
+}
+
+function renderFilters() {
+
+    const monthSelect =
+        document.getElementById('monthFilter')
+
+    const yearSelect =
+        document.getElementById('yearFilter')
+
+    for (let i = 1; i <= 12; i++) {
+
+        monthSelect.innerHTML += `
+            <option value="${i}">
+                Tháng ${i}
+            </option>
+        `
+    }
+
+    const years =
+        [...new Set(
+            expenses.map(e =>
+                new Date(e.expense_date)
+                    .getFullYear()
+            )
+        )]
+
+    years.forEach(y => {
+
+        yearSelect.innerHTML += `
+            <option value="${y}">
+                ${y}
+            </option>
+        `
+    })
+}
+
+function applyFilters() {
+
+    const month =
+        document.getElementById('monthFilter')
+            .value
+
+    const year =
+        document.getElementById('yearFilter')
+            .value
+
+    let filtered = [...expenses]
+
+    if (month) {
+
+        filtered = filtered.filter(e => {
+
+            return (
+                new Date(e.expense_date)
+                    .getMonth() + 1
+            ) == month
+        })
+    }
+
+    if (year) {
+
+        filtered = filtered.filter(e => {
+
+            return (
+                new Date(e.expense_date)
+                    .getFullYear()
+            ) == year
+        })
+    }
+
+    renderStats(filtered)
+}
+
+function renderStats(list) {
+
+    const total =
+        list.reduce(
+            (sum, e) => sum + e.amount,
+            0
+        )
+
+    document.getElementById(
+        'totalSpent'
+    ).innerText = formatMoney(total)
+
+    document.getElementById(
+        'totalExpenses'
+    ).innerText = list.length
+
+    renderHistory(list)
+
+    renderCategoryStats(list)
+
+    renderChart(list)
+}
+
+function renderHistory(list) {
+
+    const container =
+        document.getElementById('historyList')
+
+    if (!list.length) {
+
+        container.innerHTML = `
+            <div class="text-center text-slate-400 py-10">
+                Không có dữ liệu
+            </div>
+        `
+
+        return
+    }
+
+    container.innerHTML =
+        list.map(exp => {
+
+            return `
+                <div class="border-b py-4">
+
+                    <div class="flex justify-between">
+
+                        <div>
+
+                            <p class="font-bold">
+                                ${exp.name}
+                            </p>
+
+                            <p class="text-sm text-slate-500">
+                                ${categories[exp.category] || 'Khác'}
+                            </p>
+
+                        </div>
+
+                        <b class="text-rose-500">
+                            -${formatMoney(exp.amount)}
+                        </b>
+
+                    </div>
+
+                    <p class="text-xs text-slate-400 mt-2">
+                        ${exp.expense_date}
+                    </p>
+
+                </div>
+            `
+        }).join('')
+}
+
+function renderCategoryStats(list) {
+
+    const grouped = {}
+
+    list.forEach(exp => {
+
+        grouped[exp.category] =
+            (grouped[exp.category] || 0)
+            + exp.amount
+    })
+
+    const container =
+        document.getElementById('categoryStats')
+
+    container.innerHTML =
+        Object.entries(grouped)
+        .map(([key, value]) => {
+
+            return `
+                <div class="mb-4">
+
+                    <div class="flex justify-between mb-1">
+
+                        <span>
+                            ${categories[key] || 'Khác'}
+                        </span>
+
+                        <b>
+                            ${formatMoney(value)}
+                        </b>
+
+                    </div>
+
+                    <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
+
+                        <div
+                            class="bg-indigo-500 h-full"
+                            style="
+                                width:
+                                ${
+                                    (
+                                        value /
+                                        Math.max(
+                                            1,
+                                            list.reduce(
+                                                (s, e) => s + e.amount,
+                                                0
+                                            )
+                                        )
+                                    ) * 100
+                                }%
+                            "
+                        ></div>
+
+                    </div>
+
+                </div>
+            `
+        }).join('')
+}
+
+function renderChart(list) {
+
+    const grouped = {}
+
+    list.forEach(exp => {
+
+        grouped[exp.category] =
+            (grouped[exp.category] || 0)
+            + exp.amount
+    })
+
+    const ctx =
+        document.getElementById('statsChart')
+
+    if (window.statsChart) {
+
+        window.statsChart.destroy()
+    }
+
+    window.statsChart =
+        new Chart(ctx, {
+
+            type: 'doughnut',
+
+            data: {
+
+                labels:
+                    Object.keys(grouped)
+                    .map(
+                        k => categories[k]
+                    ),
+
+                datasets: [{
+                    data:
+                        Object.values(grouped)
+                }]
+            },
+
+            options: {
+
+                responsive: true,
+
+                plugins: {
+
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        })
+}
+
+init()
+
+</script>
+
+</body>
+</html>
