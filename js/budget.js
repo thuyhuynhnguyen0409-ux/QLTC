@@ -1,66 +1,100 @@
 import * as state
 from './state.js'
 
-import {
-    getDaysRemaining
+export function getDaysLeft() {
+
+    const today =
+        new Date()
+
+    const end =
+        new Date(
+            state.currentCycle.cycle_end
+        )
+
+    const diff =
+
+        Math.ceil(
+
+            (
+                end - today
+            )
+
+            /
+
+            (
+                1000 *
+                60 *
+                60 *
+                24
+            )
+        )
+
+    return Math.max(diff, 1)
 }
-from './utils.js'
 
 export function loadTodayBudget() {
 
     if (!state.currentCycle)
-        return null
+        return
 
     const daysLeft =
-        getDaysRemaining(
-            state.currentCycle.cycle_end
-        )
+        getDaysLeft()
 
-    const remainingMoney =
+    const remainMoney =
+
         Number(
-            state.currentCycle.remaining_money || 0
+            state.currentCycle
+            .remaining_money
         )
 
-    const dailyAllocation =
-        remainingMoney / daysLeft
+    // budget mới chia đều
+    const dailyBudget =
 
-    const todayStr =
+        remainMoney / daysLeft
+
+    // chi hôm nay
+
+    const today =
         new Date()
-            .toISOString()
-            .split('T')[0]
+        .toISOString()
+        .split('T')[0]
 
     const spentToday =
-        state.expenses
-            .filter(
-                exp =>
-                    exp.expense_date === todayStr
-            )
-            .reduce(
-                (
-                    sum,
-                    exp
-                ) =>
-                    sum + Number(exp.amount),
-                0
-            )
 
-    const budgetData = {
+        state.expenses
+        .filter(
+            e =>
+            e.expense_date === today
+        )
+        .reduce(
+            (sum, e) =>
+            sum + Number(e.amount),
+            0
+        )
+
+    // còn lại hôm nay
+    const remainToday =
+
+        dailyBudget -
+        spentToday
+
+    const result = {
 
         allocated:
-            dailyAllocation,
+            dailyBudget,
 
         spent:
             spentToday,
 
         remaining:
-            dailyAllocation - spentToday,
+            remainToday,
 
         daysLeft
     }
 
     state.setTodayBudget(
-        budgetData
+        result
     )
 
-    return budgetData
+    return result
 }

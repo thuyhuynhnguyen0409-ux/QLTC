@@ -1,34 +1,31 @@
-export function formatMoney(value = 0) {
+export function formatMoney(value) {
 
-    return Number(value)
+    return Number(value || 0)
         .toLocaleString('vi-VN') + 'đ'
 }
 
-export function getToday() {
+export function getTodayString() {
 
     return new Date()
         .toISOString()
         .split('T')[0]
 }
 
-export function getDaysRemaining(endDate) {
+export function calculateRemainingDays(cycleEndDate) {
 
     const today =
         new Date()
 
     const end =
-        new Date(endDate)
+        new Date(cycleEndDate)
 
     const diff =
+        end - today
+
+    const days =
         Math.ceil(
-            (
-                end - today
-            ) / (
-                1000 * 60 * 60 * 24
-            )
+            diff / (1000 * 60 * 60 * 24)
         )
 
-    return diff <= 0
-        ? 1
-        : diff
+    return days <= 0 ? 1 : days
 }

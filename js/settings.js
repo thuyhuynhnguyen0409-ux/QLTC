@@ -1,43 +1,43 @@
-import { supabase } from './supabase.js';
-import * as state from './state.js';
+let fixedIndex = 0
 
-export async function loadSettings() {
-    const { data: settings } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('user_id', state.user.id)
-        .single();
+window.addFixedCostRow =
+function () {
 
-    const { data: fixedCosts } = await supabase
-        .from('fixed_costs')
-        .select('*')
-        .eq('user_id', state.user.id);
+    fixedIndex++
 
-    if (settings) state.setSettings(settings);
-    if (fixedCosts) state.setFixedCosts(fixedCosts);
-}
+    const div =
+        document.createElement('div')
 
-export async function saveFinanceSettings(salary, payday, cycleEnd, baseSavings, fixedCostsArray) {
-    // 1. Cập nhật bảng settings
-    await supabase.from('settings').upsert({
-        user_id: state.user.id,
-        salary: salary,
-        payday: payday,
-        base_savings: baseSavings,
-        cycle_length: cycleEnd // Ở đây hiểu là ngày kết thúc
-    });
+    div.className =
+        'flex gap-2 mb-2 fixed-row'
 
-    // 2. Cập nhật chi phí cố định
-    await supabase.from('fixed_costs').delete().eq('user_id', state.user.id);
-    if (fixedCostsArray.length > 0) {
-        const rows = fixedCostsArray.map(item => ({
-            user_id: state.user.id,
-            name: item.name,
-            amount: item.amount
-        }));
-        await supabase.from('fixed_costs').insert(rows);
-    }
+    div.innerHTML = `
 
-    alert("Đã lưu thiết lập!");
-    window.location.reload();
+    <input
+        class="fixed-name flex-1 p-3 border rounded-xl"
+        placeholder="Tên"
+    >
+
+    <input
+        class="fixed-amount w-32 p-3 border rounded-xl"
+        placeholder="Tiền"
+    >
+
+    <button
+        class="bg-red-500 text-white px-4 rounded-xl"
+    >
+        X
+    </button>
+    `
+
+    div
+    .querySelector('button')
+    .onclick = () =>
+        div.remove()
+
+    document
+    .getElementById(
+        'fixedCostsList'
+    )
+    .appendChild(div)
 }

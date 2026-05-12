@@ -5,77 +5,58 @@ import {
 from './auth.js'
 
 import {
-    loadTodayBudget
+    addExpense,
+    renderExpenseList
 }
-from './budget.js'
+from './expenses.js'
 
 import {
-    updateHomeUI
+    transferSavingsToBudget
 }
-from './ui.js'
-
-import './expenses.js'
+from './savings.js'
 
 import {
-    suggestFood
+    closeDay
 }
-from './ai.js'
+from './day.js'
 
-window.logout =
-    logout
+window.logout = logout
 
-window.suggestFood =
-    suggestFood
+window.transferSavingsToBudget =
+    transferSavingsToBudget
 
-window.toggleConfigModal =
-function(show) {
+window.closeDay =
+    closeDay
 
-    document
+window.addExpense =
+async function () {
+
+    const name =
+        document
         .getElementById(
-            'configModal'
+            'expName'
         )
-        .classList
-        .toggle(
-            'hidden',
-            !show
+        .value
+
+    const amount =
+        document
+        .getElementById(
+            'expAmount'
         )
-}
+        .value
 
-window.addFixedCostRow =
-function () {
-
-    const wrap =
-        document.getElementById(
-            'fixedCostsList'
+    const category =
+        document
+        .getElementById(
+            'expCategory'
         )
+        .value
 
-    const div =
-        document.createElement('div')
-
-    div.className =
-        'flex gap-2 mb-2'
-
-    div.innerHTML = `
-
-        <input
-            class="fixed-name flex-1 p-3 border rounded-xl"
-            placeholder="Tên"
-        >
-
-        <input
-            class="fixed-amount w-32 p-3 border rounded-xl"
-            placeholder="Tiền"
-        >
-
-        <button
-            class="bg-red-500 text-white px-4 rounded-xl"
-            onclick="this.parentElement.remove()"
-        >
-            X
-        </button>
-    `
-
-    wrap.appendChild(div)
+    await addExpense(
+        name,
+        amount,
+        category
+    )
 }
 
 async function init() {
@@ -86,9 +67,48 @@ async function init() {
     if (!user)
         return
 
-    loadTodayBudget()
-
-    updateHomeUI()
+    renderExpenseList()
 }
+window.addFixedCostRow =
+function () {
 
+    const box =
+        document.getElementById(
+            'fixedCostsList'
+        )
+
+    const div =
+        document.createElement(
+            'div'
+        )
+
+    div.className =
+        'flex gap-2'
+
+    div.innerHTML = `
+
+    <input
+        class="fixed-name flex-1 p-3 border rounded-2xl"
+        placeholder="Tên phí"
+    />
+
+    <input
+        class="fixed-amount w-32 p-3 border rounded-2xl"
+        placeholder="Số tiền"
+    />
+
+    <button
+        class="bg-red-500 text-white px-4 rounded-2xl del-fixed"
+    >
+        X
+    </button>
+    `
+
+    box.appendChild(div)
+
+    div
+    .querySelector('.del-fixed')
+    .onclick = () =>
+        div.remove()
+}
 init()

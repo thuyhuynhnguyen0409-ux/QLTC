@@ -14,71 +14,64 @@ import {
 }
 from './ui.js'
 
+const today =
+    new Date()
+    .toISOString()
+    .split('T')[0]
+
 export async function addExpense(
     name,
     amount,
     category
 ) {
 
-    const val =
-        Number(amount)
+    const val = Number(amount)
 
-    if (
-        !name ||
-        isNaN(val) ||
-        val <= 0
-    ) {
+    if (!val || val <= 0) {
 
-        alert(
-            'Dữ liệu không hợp lệ'
-        )
-
+        alert('Số tiền không hợp lệ')
         return
     }
-
-    const today =
-        new Date()
-            .toISOString()
-            .split('T')[0]
 
     const {
         data,
         error
     } =
         await supabase
-            .from('expenses')
-            .insert([
-                {
-                    user_id:
-                        state.user.id,
+        .from('expenses')
+        .insert([{
 
-                    name,
+            user_id:
+                state.user.id,
 
-                    amount: val,
+            name,
 
-                    category,
+            amount: val,
 
-                    expense_date:
-                        today
-                }
-            ])
-            .select()
+            category,
+
+            expense_date: today
+        }])
+        .select()
 
     if (error) {
 
-        console.error(error)
-
-        alert(
-            'Không thể thêm chi tiêu'
-        )
-
+        alert(error.message)
         return
     }
 
-    const newRemaining =
+    state.setExpenses([
+        data[0],
+        ...state.expenses
+    ])
+
+    // update cycle
+
+    const newRemain =
+
         Number(
             state.currentCycle
-                .remaining_money
+            .remaining_money
         ) - val
 
     await supabase
@@ -86,12 +79,13 @@ export async function addExpense(
         .update({
 
             remaining_money:
-                newRemaining,
+                newRemain,
 
             total_spent:
+
                 Number(
                     state.currentCycle
-                        .total_spent || 0
+                    .total_spent
                 ) + val
         })
         .eq(
@@ -99,60 +93,278 @@ export async function addExpense(
             state.currentCycle.id
         )
 
-    state.setExpenses([
-        data[0],
-        ...state.expenses
-    ])
+    state.currentCycle
+        .remaining_money =
+        newRemain
 
-    state.currentCycle.remaining_money =
-        newRemaining
-
-    state.currentCycle.total_spent =
-        Number(
-            state.currentCycle.total_spent || 0
-        ) + val
+    state.currentCycle
+        .total_spent += val
 
     loadTodayBudget()
 
     updateHomeUI()
 
-    document.getElementById(
-        'expName'
-    ).value = ''
-
-    document.getElementById(
-        'expAmount'
-    ).value = ''
+    renderExpenseList()
 }
 
-window.addExpense =
-async function () {
+export async function deleteExpense(id) {
 
-    const name =
-        document
-            .getElementById(
-                'expName'
-            )
-            .value
-            .trim()
+    const expense =
+        state.expenses.find(
+            e => e.id === id
+        )
 
-    const amount =
-        document
-            .getElementById(
-                'expAmount'
-            )
-            .value
+    if (!expense) return
 
-    const category =
-        document
-            .getElementById(
-                'expCategory'
-            )
-            .value
+    const confirmDelete =
+        confirm(
+            'Xóa khoản chi này?'
+        )
 
-    await addExpense(
-        name,
-        amount,
-        category
+    if (!confirmDelete)
+        return
+
+    const {
+        error
+    } =
+        await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id)
+
+    if (error) {
+
+        alert(error.message)
+        return
+    }
+
+    state.setExpenses(
+
+        state.expenses.filter(
+            e => e.id !== id
+        )
     )
+
+    // cộng tiền lại
+
+    const newRemain =
+
+        Number(
+            state.currentCycle
+            .remaining_money
+        ) +
+
+        Number(expense.amount)
+
+    await supabase
+        .from('monthly_cycles')
+        .update({
+
+            remaining_money:
+                newRemain,
+
+            total_spent:
+
+                Number(
+                    state.currentCycle
+                    .total_spent
+                ) -
+
+                Number(
+                    expense.amount
+                )
+        })
+        .eq(
+            'id',
+            state.currentCycle.id
+        )
+
+    state.currentCycle
+        .remaining_money =
+        newRemain
+
+    state.currentCycle
+        .total_spent -=
+        Number(expense.amount)
+
+    loadTodayBudget()
+
+    updateHomeUI()
+
+    renderExpenseList()
+}
+
+export async function editExpense(
+    id
+) {
+
+    const expense =
+        state.expenses.find(
+            e => e.id === id
+        )
+
+    if (!expense) return
+
+    const newAmount =
+        prompt(
+            'Sửa số tiền',
+            expense.amount
+        )
+
+    if (!newAmount) return
+
+    const val =
+        Number(newAmount)
+
+    if (!val || val <= 0)
+        return
+
+    const diff =
+        val -
+        Number(expense.amount)
+
+    const {
+        error
+    } =
+        await supabase
+        .from('expenses')
+        .update({
+
+            amount: val
+        })
+        .eq(
+            'id',
+            id
+        )
+
+    if (error) {
+
+        alert(error.message)
+        return
+    }
+
+    expense.amount = val
+
+    state.currentCycle
+        .remaining_money -= diff
+
+    state.currentCycle
+        .total_spent += diff
+
+    await supabase
+        .from('monthly_cycles')
+        .update({
+
+            remaining_money:
+
+                state.currentCycle
+                .remaining_money,
+
+            total_spent:
+
+                state.currentCycle
+                .total_spent
+        })
+        .eq(
+            'id',
+            state.currentCycle.id
+        )
+
+    loadTodayBudget()
+
+    updateHomeUI()
+
+    renderExpenseList()
+}
+
+export function renderExpenseList() {
+
+    const box =
+        document.getElementById(
+            'expenseList'
+        )
+
+    if (!box) return
+
+    box.innerHTML = ''
+
+    state.expenses.forEach(
+        exp => {
+
+            const div =
+                document
+                .createElement('div')
+
+            div.className =
+                'p-4 border rounded-2xl mb-3'
+
+            div.innerHTML = `
+
+            <div class="flex justify-between">
+
+                <div>
+
+                    <h4 class="font-bold">
+                        ${exp.name}
+                    </h4>
+
+                    <p class="text-sm text-slate-500">
+                        ${exp.category}
+                    </p>
+
+                </div>
+
+                <div class="text-right">
+
+                    <p class="font-black text-red-500">
+                        ${Number(exp.amount)
+                            .toLocaleString('vi-VN')}đ
+                    </p>
+
+                    <div class="flex gap-2 mt-2">
+
+                        <button
+                            class="text-xs bg-indigo-500 text-white px-2 py-1 rounded-xl edit-btn"
+                            data-id="${exp.id}"
+                        >
+                            Sửa
+                        </button>
+
+                        <button
+                            class="text-xs bg-red-500 text-white px-2 py-1 rounded-xl del-btn"
+                            data-id="${exp.id}"
+                        >
+                            Xóa
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+            `
+
+            box.appendChild(div)
+        }
+    )
+
+    document
+    .querySelectorAll('.del-btn')
+    .forEach(btn => {
+
+        btn.onclick = () =>
+            deleteExpense(
+                btn.dataset.id
+            )
+    })
+
+    document
+    .querySelectorAll('.edit-btn')
+    .forEach(btn => {
+
+        btn.onclick = () =>
+            editExpense(
+                btn.dataset.id
+            )
+    })
 }
