@@ -230,74 +230,147 @@ Finance AI
 
 </div>
 
+
 <!-- CONFIG MODAL -->
 
 <div
     id="configModal"
-    class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+    class="hidden fixed inset-0 bg-black/50 z-50 overflow-y-auto"
 >
 
-<div class="bg-white w-full max-w-md rounded-3xl p-5">
+<div class="min-h-screen flex items-end md:items-center justify-center p-3">
 
-    <div class="flex justify-between items-center mb-5">
+<div class="bg-white w-full max-w-lg rounded-t-[35px] md:rounded-[35px] p-5">
 
-        <h2 class="text-2xl font-black">
-            Thiết lập
-        </h2>
+    <!-- HEADER -->
+
+    <div class="flex justify-between items-center mb-6">
+
+        <div>
+
+            <h2 class="text-3xl font-black">
+                Thiết lập tài chính
+            </h2>
+
+            <p class="text-slate-500 text-sm mt-1">
+                Cấu hình chu kỳ chi tiêu
+            </p>
+
+        </div>
 
         <button
             onclick="toggleConfigModal(false)"
-            class="text-2xl"
+            class="w-10 h-10 rounded-full bg-slate-100 text-xl"
         >
             ×
         </button>
 
     </div>
 
-    <input
-        id="salaryInput"
-        class="w-full p-3 border rounded-xl mb-3"
-        placeholder="Thu nhập tháng"
-    />
+    <!-- FORM -->
 
-    <input
-        id="savingsInput"
-        class="w-full p-3 border rounded-xl mb-3"
-        placeholder="Tiết kiệm ban đầu"
-    />
+    <div class="space-y-4">
 
-    <input
-        id="paydayInput"
-        type="number"
-        class="w-full p-3 border rounded-xl mb-3"
-        placeholder="Ngày nhận lương"
-    />
+        <div>
 
-    <input
-        id="cycleEndInput"
-        type="number"
-        class="w-full p-3 border rounded-xl mb-3"
-        placeholder="Ngày kết thúc chu kỳ"
-    />
+            <label class="text-sm font-bold text-slate-600">
+                Thu nhập tháng
+            </label>
 
-    <div
-        id="fixedCostsList"
-        class="mb-3"
-    ></div>
+            <input
+                id="salaryInput"
+                class="w-full mt-2 p-4 bg-slate-100 rounded-2xl outline-none"
+                placeholder="10.000.000"
+            />
 
-    <button
-        onclick="addFixedCostRow()"
-        class="w-full border-2 border-dashed border-slate-300 p-3 rounded-2xl mb-4"
-    >
-        + Thêm chi phí cố định
-    </button>
+        </div>
 
-    <button
-        onclick="initBudget()"
-        class="w-full bg-indigo-500 text-white p-4 rounded-2xl font-bold"
-    >
-        Lưu thiết lập
-    </button>
+        <div>
+
+            <label class="text-sm font-bold text-slate-600">
+                Tiết kiệm ban đầu
+            </label>
+
+            <input
+                id="savingsInput"
+                class="w-full mt-2 p-4 bg-slate-100 rounded-2xl outline-none"
+                placeholder="2.000.000"
+            />
+
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+
+            <div>
+
+                <label class="text-sm font-bold text-slate-600">
+                    Ngày nhận lương
+                </label>
+
+                <input
+                    id="paydayInput"
+                    type="number"
+                    class="w-full mt-2 p-4 bg-slate-100 rounded-2xl outline-none"
+                    placeholder="1"
+                />
+
+            </div>
+
+            <div>
+
+                <label class="text-sm font-bold text-slate-600">
+                    Ngày kết thúc
+                </label>
+
+                <input
+                    id="cycleEndInput"
+                    type="number"
+                    class="w-full mt-2 p-4 bg-slate-100 rounded-2xl outline-none"
+                    placeholder="30"
+                />
+
+            </div>
+
+        </div>
+
+        <!-- FIXED COSTS -->
+
+        <div class="pt-2">
+
+            <div class="flex justify-between items-center mb-3">
+
+                <h3 class="font-black text-lg">
+                    Chi phí cố định
+                </h3>
+
+                <button
+                    onclick="addFixedCostRow()"
+                    class="bg-indigo-500 text-white px-4 py-2 rounded-2xl text-sm font-bold"
+                >
+                    + Thêm
+                </button>
+
+            </div>
+
+            <div
+                id="fixedCostsList"
+                class="space-y-3"
+            ></div>
+
+        </div>
+
+        <!-- SAVE -->
+
+        <button
+            onclick="initBudget()"
+            class="w-full bg-slate-900 text-white p-4 rounded-2xl font-black text-lg mt-4"
+        >
+            Lưu thiết lập
+        </button>
+
+    </div>
+
+</div>
 
 </div>
 

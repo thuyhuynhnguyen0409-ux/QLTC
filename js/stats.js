@@ -1,22 +1,53 @@
-import { supabase } from './supabase.js';
-import * as state from './state.js';
+import { supabase }
+from './supabase.js'
 
-export async function getYearlyStats(year) {
-    const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('user_id', state.user.id)
-        .gte('expense_date', `${year}-01-01`)
-        .lte('expense_date', `${year}-12-31`);
+import * as state
+from './state.js'
 
-    if (error) return {};
+export async function getYearlyStats(
+    year
+) {
 
-    // Gom nhóm dữ liệu theo tháng
-    const monthlyStats = Array(12).fill(0);
+    const {
+        data,
+        error
+    } =
+        await supabase
+            .from('expenses')
+            .select('*')
+            .eq(
+                'user_id',
+                state.user.id
+            )
+            .gte(
+                'expense_date',
+                `${year}-01-01`
+            )
+            .lte(
+                'expense_date',
+                `${year}-12-31`
+            )
+
+    if (error) {
+
+        console.error(error)
+
+        return Array(12).fill(0)
+    }
+
+    const monthlyStats =
+        Array(12).fill(0)
+
     data.forEach(exp => {
-        const month = new Date(exp.expense_date).getMonth();
-        monthlyStats[month] += Number(exp.amount);
-    });
 
-    return monthlyStats;
+        const month =
+            new Date(
+                exp.expense_date
+            ).getMonth()
+
+        monthlyStats[month] +=
+            Number(exp.amount)
+    })
+
+    return monthlyStats
 }

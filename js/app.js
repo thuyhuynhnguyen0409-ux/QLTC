@@ -1,57 +1,91 @@
-// js/app.js
-
-import { checkAuth, logout } from './auth.js'
-
-window.logout = logout
-
-// TEST FUNCTION
-window.addExpense = () => {
-
-    alert('Add expense chạy OK')
+import {
+    checkAuth,
+    logout
 }
+from './auth.js'
 
-window.suggestFood = () => {
-
-    alert('AI chạy OK')
+import {
+    loadSettings
 }
+from './settings.js'
 
-window.toggleConfigModal = (show) => {
+import {
+    loadTodayBudget
+}
+from './budget.js'
 
-    const modal =
-        document.getElementById(
+import {
+    updateHomeUI
+}
+from './ui.js'
+
+import './expenses.js'
+
+window.logout =
+    logout
+
+window.toggleConfigModal =
+function(show) {
+
+    document
+        .getElementById(
             'configModal'
         )
-
-    if (!modal) return
-
-    modal.classList.toggle(
-        'hidden',
-        !show
-    )
+        .classList
+        .toggle(
+            'hidden',
+            !show
+        )
 }
+window.addFixedCostRow =
+function () {
 
+    const wrap =
+        document.getElementById(
+            'fixedCostsList'
+        )
+
+    const div =
+        document.createElement('div')
+
+    div.className =
+        'flex gap-2 mb-2'
+
+    div.innerHTML = `
+
+        <input
+            class="fixed-name flex-1 p-3 border rounded-xl"
+            placeholder="Tên"
+        >
+
+        <input
+            class="fixed-amount w-32 p-3 border rounded-xl"
+            placeholder="Tiền"
+        >
+
+        <button
+            class="bg-red-500 text-white px-4 rounded-xl"
+            onclick="this.parentElement.remove()"
+        >
+            X
+        </button>
+    `
+
+    wrap.appendChild(div)
+}
 async function init() {
 
     const user =
         await checkAuth()
 
-    if (!user) return
+    if (!user)
+        return
 
-    console.log(
-        'Đăng nhập:',
-        user.email
-    )
+    await loadSettings()
 
-    const userDisplay =
-        document.getElementById(
-            'userEmailDisplay'
-        )
+    loadTodayBudget()
 
-    if (userDisplay) {
-
-        userDisplay.innerText =
-            user.email
-    }
+    updateHomeUI()
 }
 
 init()

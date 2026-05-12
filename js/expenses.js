@@ -1,57 +1,165 @@
-import { supabase } from './supabase.js';
-import * as state from './state.js';
-import { loadTodayBudget } from './budget.js';
-import { updateHomeUI } from './ui.js';
+import { supabase }
+from './supabase.js'
 
-export async function addExpense(name, amount, category) {
-    const val = Number(amount);
-    if (isNaN(val) || val <= 0) return alert("Số tiền không hợp lệ");
+import * as state
+from './state.js'
 
-    // 1. Thêm vào DB
-    const { data, error } = await supabase
-        .from('expenses')
-        .insert([{
-            user_id: state.user.id,
-            name: name,
-            amount: val,
-            category: category,
-            expense_date: new Date().toISOString().split('T')[0]
-        }])
-        .select();
+import {
+    loadTodayBudget
+}
+from './budget.js'
 
-    if (error) return alert("Lỗi lưu dữ liệu");
+import {
+    updateHomeUI
+}
+from './ui.js'
 
-    // 2. Cập nhật số dư chu kỳ (Trừ thẳng vào tổng tiền còn lại)
-    const newRemaining = state.currentCycle.remaining_money - val;
-    await supabase
-        .from('monthly_cycles')
-        .update({ remaining_money: newRemaining })
-        .eq('id', state.currentCycle.id);
+export async function addExpense(
+    name,
+    amount,
+    category
+) {
 
-    // 3. Cập nhật state cục bộ
-    state.setExpenses([data[0], ...state.expenses]);
-    state.currentCycle.remaining_money = newRemaining;
+    const val =
+        Number(amount)
 
-    // 4. LOGIC TIẾT KIỆM (Tùy chọn): Nếu bạn muốn mỗi lần tiêu dư thì cộng vào hũ ngay, 
-    // nhưng theo logic của bạn là "Tiêu ít hơn cho phép thì gửi vào hũ". 
-    // Chúng ta sẽ thực hiện việc "Chốt hũ" vào cuối ngày hoặc thủ công.
+    if (
+        !name ||
+        isNaN(val) ||
+        val <= 0
+    ) {
 
-    loadTodayBudget();
-    updateHomeUI();
+        alert(
+            'Dữ liệu không hợp lệ'
+        )
+
+        return
+    }
+
+    const today =
+        new Date()
+            .toISOString()
+            .split('T')[0]
+
+    const {
+        data,
+        error
+    } =
+        await supabase
+            .from('expenses')
+            .insert([
+                {
+                    user_id:
+                        state.user.id,
+
+                    name,
+
+                    amount: val,
+
+                    category,
+
+                    expense_date:
+                        today
+                }
+            ])
+            .select()
+
+    if (error) {
+
+        console.error(error)
+
+        alert(
+            'Không thể thêm chi tiêu'
+        )
+
+        return
+    }
+
+    const newRemaining =
+        Number(
+            state.currentCycle
+                .remaining_money
+        ) - val
+
+    const {
+        error: cycleError
+    } =
+        await supabase
+            .from('monthly_cycles')
+            .update({
+                remaining_money:
+                    newRemaining,
+
+                total_spent:
+                    Number(
+                        state.currentCycle
+                            .total_spent || 0
+                    ) + val
+            })
+            .eq(
+                'id',
+                state.currentCycle.id
+            )
+
+    if (cycleError) {
+
+        console.error(cycleError)
+    }
+
+    state.setExpenses([
+        data[0],
+        ...state.expenses
+    ])
+
+    state.currentCycle.remaining_money =
+        newRemaining
+
+    state.currentCycle.total_spent =
+        Number(
+            state.currentCycle.total_spent || 0
+        ) + val
+
+    loadTodayBudget()
+
+    updateHomeUI()
+
+    document.getElementById(
+        'expName'
+    ).value = ''
+
+    document.getElementById(
+        'expAmount'
+    ).value = ''
 }
 
-// Hàm chuyển tiền từ tiết kiệm sang chi tiêu (Tăng hạn mức)
-export async function transferSavings(amount) {
-    const val = Number(amount);
-    const newSavings = state.currentSavings - val;
-    const newRemaining = state.currentCycle.remaining_money + val;
+window.addExpense =
+async function () {
 
-    await supabase.from('settings').update({ current_savings: newSavings }).eq('user_id', state.user.id);
-    await supabase.from('monthly_cycles').update({ remaining_money: newRemaining }).eq('id', state.currentCycle.id);
+    const name =
+        document
+            .getElementById(
+                'expName'
+            )
+            .value
+            .trim()
 
-    state.setCurrentSavings(newSavings);
-    state.currentCycle.remaining_money = newRemaining;
-    
-    loadTodayBudget();
-    updateHomeUI();
+    const amount =
+        document
+            .getElementById(
+                'expAmount'
+            )
+            .value
+
+    const category =
+        document
+            .getElementById(
+                'expCategory'
+            )
+            .value
+
+    await addExpense(
+        name,
+        amount,
+        category
+    )
 }

@@ -1,29 +1,82 @@
-import * as state from './state.js';
-import { getDaysRemaining } from './utils.js';
+import * as state from './state.js'
+
+export function getDaysRemaining(endDate) {
+
+    const today =
+        new Date()
+
+    const end =
+        new Date(endDate)
+
+    const diff =
+        Math.ceil(
+            (
+                end - today
+            ) / (
+                1000 * 60 * 60 * 24
+            )
+        )
+
+    return diff <= 0
+        ? 1
+        : diff
+}
 
 export function loadTodayBudget() {
-    if (!state.currentCycle) return null;
 
-    // 1. Tính số ngày còn lại trong chu kỳ
-    const daysLeft = getDaysRemaining(state.currentCycle.cycle_end_day);
+    if (!state.currentCycle)
+        return null
 
-    // 2. Tính hạn mức mỗi ngày (Dựa trên tổng tiền còn lại trong chu kỳ / số ngày còn lại)
-    // Nếu hôm qua tiêu âm, remaining_money đã nhỏ đi -> dailyAllocation tự giảm cho các ngày sau
-    const dailyAllocation = state.currentCycle.remaining_money / daysLeft;
+    const daysLeft =
+        getDaysRemaining(
+            state.currentCycle.cycle_end
+        )
 
-    // 3. Tính số tiền đã tiêu hôm nay
-    const todayStr = new Date().toISOString().split('T')[0];
-    const spentToday = state.expenses
-        .filter(exp => exp.expense_date === todayStr)
-        .reduce((sum, exp) => sum + Number(exp.amount), 0);
+    const remainingMoney =
+        Number(
+            state.currentCycle.remaining_money || 0
+        )
+
+    const dailyAllocation =
+        remainingMoney / daysLeft
+
+    const todayStr =
+        new Date()
+            .toISOString()
+            .split('T')[0]
+
+    const spentToday =
+        state.expenses
+            .filter(
+                exp =>
+                    exp.expense_date === todayStr
+            )
+            .reduce(
+                (
+                    sum,
+                    exp
+                ) =>
+                    sum + Number(exp.amount),
+                0
+            )
 
     const budgetData = {
-        allocated: dailyAllocation, // Số tiền hiển thị cho các ngày tiếp theo
-        spent: spentToday,
-        remaining: dailyAllocation - spentToday, // Số tiền còn lại của riêng hôm nay (có thể âm)
-        daysLeft: daysLeft
-    };
 
-    state.setTodayBudget(budgetData);
-    return budgetData;
+        allocated:
+            dailyAllocation,
+
+        spent:
+            spentToday,
+
+        remaining:
+            dailyAllocation - spentToday,
+
+        daysLeft
+    }
+
+    state.setTodayBudget(
+        budgetData
+    )
+
+    return budgetData
 }
