@@ -5,11 +5,6 @@ import {
 from './auth.js'
 
 import {
-    loadSettings
-}
-from './settings.js'
-
-import {
     loadTodayBudget
 }
 from './budget.js'
@@ -21,8 +16,16 @@ from './ui.js'
 
 import './expenses.js'
 
+import {
+    suggestFood
+}
+from './ai.js'
+
 window.logout =
     logout
+
+window.suggestFood =
+    suggestFood
 
 window.toggleConfigModal =
 function(show) {
@@ -37,6 +40,7 @@ function(show) {
             !show
         )
 }
+
 window.addFixedCostRow =
 function () {
 
@@ -73,6 +77,7 @@ function () {
 
     wrap.appendChild(div)
 }
+
 async function init() {
 
     const user =
@@ -80,8 +85,6 @@ async function init() {
 
     if (!user)
         return
-
-    await loadSettings()
 
     loadTodayBudget()
 

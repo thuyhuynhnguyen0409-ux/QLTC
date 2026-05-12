@@ -1,37 +1,94 @@
-import * as state from './state.js';
-import { formatMoney } from './utils.js';
+import * as state
+from './state.js'
+
+import {
+    formatMoney
+}
+from './utils.js'
+
+import {
+    renderChart
+}
+from './charts.js'
 
 export function updateHomeUI() {
-    const budget = state.todayBudget;
-    if (!budget) return;
 
-    // Số tiền hôm nay (Có thể âm)
-    const dailyElem = document.getElementById('dailyBudget');
-    dailyElem.innerText = formatMoney(budget.remaining);
-    dailyElem.className = budget.remaining < 0 ? "text-4xl font-black mt-2 text-red-500" : "text-4xl font-black mt-2 text-slate-900";
+    if (!state.todayBudget)
+        return
 
-    // Số tiền định mức cho các ngày tới
-    const nextDaysElem = document.getElementById('remainingCycle');
-    if (nextDaysElem) {
-        nextDaysElem.innerText = formatMoney(budget.allocated);
-    }
+    document.getElementById(
+        'dailyBudget'
+    ).innerText =
+        formatMoney(
+            state.todayBudget.remaining
+        )
 
-    // Hũ tiết kiệm
-    document.getElementById('currentSavings').innerText = formatMoney(state.currentSavings);
-    document.getElementById('userEmailDisplay').innerText = state.user.email;
+    document.getElementById(
+        'remainingCycle'
+    ).innerText =
+        formatMoney(
+            state.currentCycle.remaining_money
+        )
 
-    renderExpenseList();
+    document.getElementById(
+        'currentSavings'
+    ).innerText =
+        formatMoney(
+            state.currentSavings
+        )
+
+    renderExpenseList()
+
+    renderChart(
+
+        state.currentCycle.total_fixed || 0,
+
+        state.currentCycle.total_spent || 0,
+
+        state.currentCycle.remaining_money || 0,
+
+        state.currentSavings || 0
+    )
 }
 
 function renderExpenseList() {
-    const container = document.getElementById('expenseList');
-    container.innerHTML = state.expenses.map(exp => `
-        <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl mb-2">
-            <div>
-                <p class="font-bold">${exp.name}</p>
-                <p class="text-xs text-slate-500">${exp.expense_date}</p>
+
+    const wrap =
+        document.getElementById(
+            'expenseList'
+        )
+
+    if (!wrap) return
+
+    wrap.innerHTML = ''
+
+    state.expenses.forEach(exp => {
+
+        wrap.innerHTML += `
+
+        <div class="p-3 border rounded-2xl mb-2 bg-slate-50">
+
+            <div class="flex justify-between">
+
+                <div>
+
+                    <h4 class="font-bold">
+                        ${exp.name}
+                    </h4>
+
+                    <p class="text-sm text-slate-500">
+                        ${exp.category}
+                    </p>
+
+                </div>
+
+                <b class="text-red-500">
+                    ${formatMoney(exp.amount)}
+                </b>
+
             </div>
-            <p class="font-bold text-red-500">-${formatMoney(exp.amount)}</p>
+
         </div>
-    `).join('');
+        `
+    })
 }

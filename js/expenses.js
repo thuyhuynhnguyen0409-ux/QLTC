@@ -81,30 +81,23 @@ export async function addExpense(
                 .remaining_money
         ) - val
 
-    const {
-        error: cycleError
-    } =
-        await supabase
-            .from('monthly_cycles')
-            .update({
-                remaining_money:
-                    newRemaining,
+    await supabase
+        .from('monthly_cycles')
+        .update({
 
-                total_spent:
-                    Number(
-                        state.currentCycle
-                            .total_spent || 0
-                    ) + val
-            })
-            .eq(
-                'id',
-                state.currentCycle.id
-            )
+            remaining_money:
+                newRemaining,
 
-    if (cycleError) {
-
-        console.error(cycleError)
-    }
+            total_spent:
+                Number(
+                    state.currentCycle
+                        .total_spent || 0
+                ) + val
+        })
+        .eq(
+            'id',
+            state.currentCycle.id
+        )
 
     state.setExpenses([
         data[0],

@@ -1,4 +1,5 @@
 export let user = null
+
 export let settings = {}
 
 export let expenses = []
@@ -12,6 +13,7 @@ export let fixedCosts = []
 export let currentSavings = 0
 
 export function setUser(v) {
+
     user = v
 }
 
@@ -29,21 +31,26 @@ export function setSettings(v) {
 }
 
 export function setExpenses(v) {
+
     expenses = v
 }
 
 export function setCurrentCycle(v) {
+
     currentCycle = v
 }
 
 export function setTodayBudget(v) {
+
     todayBudget = v
 }
 
 export function setFixedCosts(v) {
+
     fixedCosts = v
 }
 
 export function setCurrentSavings(v) {
+
     currentSavings = Number(v)
 }
