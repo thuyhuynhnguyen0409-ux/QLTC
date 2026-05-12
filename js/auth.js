@@ -1,9 +1,5 @@
-
 import { supabase }
 from './supabase.js'
-
-import { setUser }
-from './state.js'
 
 export async function loginWithEmail(email) {
 
@@ -17,7 +13,7 @@ export async function loginWithEmail(email) {
                 options: {
 
                     emailRedirectTo:
-                        'https://qltc-tawny.vercel.app'
+                        'https://qltc-tawny.vercel.app/index.html'
                 }
             })
 
@@ -27,18 +23,18 @@ export async function loginWithEmail(email) {
 
             alert(error.message)
 
-            return false
+            return
         }
 
-        return true
+        alert(
+            'Đã gửi link đăng nhập.\nVui lòng kiểm tra email.'
+        )
 
     } catch (err) {
 
         console.error(err)
 
         alert('Không thể gửi email')
-
-        return false
     }
 }
 
@@ -46,13 +42,8 @@ export async function logout() {
 
     await supabase.auth.signOut()
 
-    localStorage.clear()
-
-    sessionStorage.clear()
-
-    window.location.replace(
+    window.location.href =
         './auth.html'
-    )
 }
 
 export async function checkAuth() {
@@ -62,23 +53,13 @@ export async function checkAuth() {
     } =
         await supabase.auth.getSession()
 
-    if (!session?.user) {
+    if (!session) {
 
-        if (
-            !window.location.pathname
-                .includes('auth.html')
-        ) {
-
-            window.location.replace(
-                './auth.html'
-            )
-        }
+        window.location.href =
+            './auth.html'
 
         return null
     }
 
-    setUser(session.user)
-
     return session.user
 }
-

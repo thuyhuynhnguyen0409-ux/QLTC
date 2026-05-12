@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 
 <head>
 
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 
 <meta
     name="viewport"
@@ -17,108 +16,59 @@ Finance AI Login
 
 <script src="https://cdn.tailwindcss.com"></script>
 
-<link
-    rel="preconnect"
-    href="https://fonts.googleapis.com"
-/>
-
-<link
-    rel="preconnect"
-    href="https://fonts.gstatic.com"
-    crossorigin
-/>
-
-<link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap"
-    rel="stylesheet"
-/>
-
-<style>
-
-body {
-
-    font-family: 'Inter', sans-serif;
-}
-
-</style>
-
 </head>
 
-<body class="bg-slate-100 min-h-screen flex items-center justify-center p-5">
+<body class="bg-slate-950 min-h-screen flex items-center justify-center p-5">
 
-<div class="w-full max-w-md">
+<div class="bg-slate-900 w-full max-w-md p-8 rounded-[30px] shadow-2xl border border-slate-800">
 
-    <!-- CARD -->
+<div class="text-center mb-8">
 
-    <div class="bg-white rounded-[32px] p-8 shadow-sm">
+<div class="text-6xl mb-4">
+💸
+</div>
 
-        <!-- LOGO -->
+<h1 class="text-5xl font-black text-white">
+Finance AI
+</h1>
 
-        <div class="mb-8 text-center">
+<p class="text-slate-400 mt-3">
+Nhập email để nhận link đăng nhập
+</p>
 
-            <div class="text-6xl mb-3">
-                💸
-            </div>
+</div>
 
-            <h1 class="text-4xl font-black text-slate-800">
-                Finance AI
-            </h1>
+<div class="space-y-4">
 
-            <p class="text-slate-500 mt-3 leading-relaxed">
+<div>
 
-                Nhập email để nhận
-                link đăng nhập từ Supabase
+<label class="text-sm text-slate-300 font-bold">
+Email
+</label>
 
-            </p>
+<input
+    id="email"
+    type="email"
+    placeholder="you@gmail.com"
+    class="w-full mt-2 p-4 rounded-2xl bg-slate-800 border border-slate-700 text-white outline-none"
+/>
 
-        </div>
+</div>
 
-        <!-- EMAIL -->
+<button
+    id="loginBtn"
+    class="w-full bg-indigo-500 hover:bg-indigo-600 transition text-white font-black p-4 rounded-2xl text-lg"
+>
 
-        <div class="mb-5">
+Gửi link đăng nhập
 
-            <label class="text-sm font-bold text-slate-700 block mb-2">
+</button>
 
-                Email
+</div>
 
-            </label>
-
-            <input
-                id="email"
-                type="email"
-                placeholder="example@gmail.com"
-                class="w-full p-4 rounded-2xl border border-slate-200 outline-none focus:border-indigo-500"
-            />
-
-        </div>
-
-        <!-- BUTTON -->
-
-        <button
-            id="loginBtn"
-            class="w-full bg-indigo-500 hover:bg-indigo-600 transition text-white font-bold p-4 rounded-2xl"
-        >
-
-            Gửi link đăng nhập
-
-        </button>
-
-        <!-- MESSAGE -->
-
-        <div
-            id="message"
-            class="hidden mt-5 bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-2xl text-sm leading-relaxed"
-        ></div>
-
-    </div>
-
-    <!-- FOOTER -->
-
-    <p class="text-center text-sm text-slate-400 mt-5">
-
-        Secure login powered by Supabase
-
-    </p>
+<p class="text-center text-slate-500 text-sm mt-8">
+Secure login powered by Supabase
+</p>
 
 </div>
 
@@ -129,51 +79,27 @@ import {
 }
 from './js/auth.js'
 
-const btn =
-    document.getElementById(
-        'loginBtn'
-    )
+document
+    .getElementById('loginBtn')
+    .addEventListener(
+        'click',
+        async () => {
 
-btn.addEventListener(
-    'click',
-    async () => {
+            const email =
+                document
+                    .getElementById('email')
+                    .value
+                    .trim()
 
-        console.log('CLICK')
+            if (!email) {
 
-        const email =
-            document
-            .getElementById('email')
-            .value
-            .trim()
+                alert('Nhập email')
+                return
+            }
 
-        if (!email) {
-
-            alert('Nhập email')
-
-            return
-        }
-
-        btn.disabled = true
-
-        btn.innerText =
-            'Đang gửi...'
-
-        const success =
             await loginWithEmail(email)
-
-        btn.disabled = false
-
-        btn.innerText =
-            'Gửi link đăng nhập'
-
-        if (success) {
-
-            alert(
-                'Đã gửi email đăng nhập.\nHãy kiểm tra hộp thư.'
-            )
         }
-    }
-)
+    )
 
 </script>
 

@@ -1,17 +1,13 @@
-
-import {
-    createClient
-}
+import { createClient }
 from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
 const SUPABASE_URL =
-    'https://mojulicyvkrwoxbjpsem.supabase.co'
+'https://mojulicyvkrwoxbjpsem.supabase.co'
 
-const SUPABASE_ANON_KEY =
-    'YOUR_ANON_KEY'
+const SUPABASE_ANON_KEY ='sb_publishable_UPZNbtGZ7VnWzBtl7wyEmg_uyufvl-G'
 
 export const supabase =
-    createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-    )
+createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+)
