@@ -71,49 +71,34 @@ Secure login powered by Supabase
 </p>
 
 </div>
-
 <script type="module">
-    // Đảm bảo đường dẫn này khớp với cấu trúc thư mục của bạn
-    import { loginWithEmail } from './js/auth.js'
+    // Đảm bảo file js/auth.js tồn tại đúng vị trí này
+    import { loginWithEmail } from './js/auth.js'; 
 
-    // Đợi DOM sẵn sàng để tránh lỗi "không tìm thấy element"
-    document.addEventListener('DOMContentLoaded', () => {
-        const loginBtn = document.getElementById('loginBtn');
-        const emailInput = document.getElementById('email');
+    const loginBtn = document.getElementById('loginBtn');
+    
+    loginBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        
+        if (!email) {
+            alert('Vui lòng nhập email');
+            return;
+        }
 
-        if (loginBtn) {
-            loginBtn.addEventListener('click', async (e) => {
-                // Ngăn chặn hành vi mặc định nếu có
-                e.preventDefault();
+        loginBtn.disabled = true;
+        loginBtn.innerText = 'Đang xử lý...';
 
-                const email = emailInput.value.trim();
-
-                if (!email) {
-                    alert('Vui lòng nhập email');
-                    return;
-                }
-
-                // Hiệu ứng loading cho nút bấm
-                loginBtn.disabled = true;
-                loginBtn.innerHTML = `
-                    <svg class="animate-spin h-5 w-5 mr-3 inline-block" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg> Đang gửi...`;
-
-                try {
-                    await loginWithEmail(email);
-                } catch (err) {
-                    console.error("Lỗi hệ thống:", err);
-                    alert("Có lỗi xảy ra, vui lòng thử lại.");
-                } finally {
-                    loginBtn.disabled = false;
-                    loginBtn.innerText = 'Gửi link đăng nhập';
-                }
-            });
+        try {
+            await loginWithEmail(email);
+        } catch (err) {
+            console.error(err);
+            alert('Lỗi hệ thống, vui lòng thử lại');
+        } finally {
+            loginBtn.disabled = false;
+            loginBtn.innerText = 'Gửi link đăng nhập';
         }
     });
 </script>
-
 </body>
 </html>

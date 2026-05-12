@@ -39,11 +39,9 @@ export async function loginWithEmail(email) {
 }
 
 export async function logout() {
-
-    await supabase.auth.signOut()
-
-    window.location.href =
-        './auth.html'
+    await supabase.auth.signOut();
+    localStorage.clear(); // Xóa sạch state cũ
+    window.location.href = './auth.html';
 }
 
 export async function checkAuth() {

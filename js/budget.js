@@ -1,102 +1,29 @@
-import { supabase } from './supabase.js'
+import * as state from './state.js';
+import { getDaysRemaining } from './utils.js';
 
-import {
-    user,
-    currentCycle,
-    todayBudget,
-    settings,
-    fixedCosts,
-    setCurrentCycle,
-    setTodayBudget
-} from './state.js'
+export function loadTodayBudget() {
+    if (!state.currentCycle) return null;
 
-export async function generateCycle() {
+    // 1. Tính số ngày còn lại trong chu kỳ
+    const daysLeft = getDaysRemaining(state.currentCycle.cycle_end_day);
 
-    const totalFixed =
-        fixedCosts.reduce(
-            (sum, item) =>
-                sum + item.amount,
-            0
-        )
+    // 2. Tính hạn mức mỗi ngày (Dựa trên tổng tiền còn lại trong chu kỳ / số ngày còn lại)
+    // Nếu hôm qua tiêu âm, remaining_money đã nhỏ đi -> dailyAllocation tự giảm cho các ngày sau
+    const dailyAllocation = state.currentCycle.remaining_money / daysLeft;
 
-    const usableMoney =
-        settings.salary
-        - totalFixed
-        - settings.base_savings
+    // 3. Tính số tiền đã tiêu hôm nay
+    const todayStr = new Date().toISOString().split('T')[0];
+    const spentToday = state.expenses
+        .filter(exp => exp.expense_date === todayStr)
+        .reduce((sum, exp) => sum + Number(exp.amount), 0);
 
-    const start =
-        new Date()
+    const budgetData = {
+        allocated: dailyAllocation, // Số tiền hiển thị cho các ngày tiếp theo
+        spent: spentToday,
+        remaining: dailyAllocation - spentToday, // Số tiền còn lại của riêng hôm nay (có thể âm)
+        daysLeft: daysLeft
+    };
 
-    const end =
-        new Date(
-            start.getFullYear(),
-            start.getMonth(),
-            settings.cycle_end_day
-        )
-
-    const totalDays =
-        Math.ceil(
-            (end - start) / 86400000
-        ) + 1
-
-    const dailyBudget =
-        Math.floor(
-            usableMoney / totalDays
-        )
-
-    const { data: cycle } =
-        await supabase
-            .from('monthly_cycles')
-            .insert({
-                user_id: user.id,
-                cycle_start: start,
-                cycle_end: end,
-                total_income: settings.salary,
-                total_fixed: totalFixed,
-                total_savings: settings.base_savings,
-                usable_money: usableMoney,
-                remaining_money: usableMoney
-            })
-            .select()
-            .single()
-
-    for (let i = 0; i < totalDays; i++) {
-
-        const date =
-            new Date(start)
-
-        date.setDate(
-            start.getDate() + i
-        )
-
-        await supabase
-            .from('daily_budgets')
-            .insert({
-                user_id: user.id,
-                cycle_id: cycle.id,
-                budget_date:
-                    date.toISOString()
-                        .split('T')[0],
-                allocated: dailyBudget,
-                remaining: dailyBudget
-            })
-    }
-}
-
-export async function loadTodayBudget() {
-
-    const today =
-        new Date()
-            .toISOString()
-            .split('T')[0]
-
-    const { data } =
-        await supabase
-            .from('daily_budgets')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('budget_date', today)
-            .single()
-
-    setTodayBudget(data)
+    state.setTodayBudget(budgetData);
+    return budgetData;
 }

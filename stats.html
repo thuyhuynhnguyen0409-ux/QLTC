@@ -1,177 +1,70 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-
-<meta charset="UTF-8" />
-
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-/>
-
-<title>
-Thống kê - Finance AI
-</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<link
-    rel="stylesheet"
-    href="./css/style.css"
-/>
-
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Thống kê - Finance AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="./css/style.css"/>
 </head>
 
 <body class="bg-slate-100 min-h-screen">
-
 <div class="max-w-md mx-auto p-4">
-
-    <!-- HEADER -->
-
     <div class="flex justify-between items-center mb-5">
-
         <div>
-
-            <h1 class="text-3xl font-black">
-                Thống kê
-            </h1>
-
-            <p class="text-slate-500 text-sm">
-                Lịch sử chi tiêu
-            </p>
-
+            <h1 class="text-3xl font-black">Thống kê</h1>
+            <p class="text-slate-500 text-sm">Lịch sử chi tiêu</p>
         </div>
-
-        <a
-            href="./index.html"
-            class="bg-indigo-500 text-white px-4 py-2 rounded-2xl text-sm font-bold"
-        >
+        <a href="./index.html" class="bg-indigo-500 text-white px-4 py-2 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-200">
             Trang chủ
         </a>
-
     </div>
 
-    <!-- OVERVIEW -->
-
     <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
-
-        <div class="grid grid-cols-2 gap-4">
-
-            <div>
-
-                <p class="text-slate-500 text-sm">
-                    Tổng chi tiêu
-                </p>
-
-                <h2
-                    id="totalSpent"
-                    class="text-2xl font-black text-rose-500 mt-1"
-                >
-                    0đ
-                </h2>
-
+        <div class="grid grid-cols-2 gap-4 text-center">
+            <div class="border-r border-slate-100">
+                <p class="text-slate-500 text-xs uppercase font-bold">Tổng chi tiêu</p>
+                <h2 id="totalSpent" class="text-xl font-black text-rose-500 mt-1">0đ</h2>
             </div>
-
             <div>
-
-                <p class="text-slate-500 text-sm">
-                    Số giao dịch
-                </p>
-
-                <h2
-                    id="totalExpenses"
-                    class="text-2xl font-black mt-1"
-                >
-                    0
-                </h2>
-
+                <p class="text-slate-500 text-xs uppercase font-bold">Giao dịch</p>
+                <h2 id="totalExpenses" class="text-xl font-black text-slate-800 mt-1">0</h2>
             </div>
-
         </div>
-
     </div>
 
-    <!-- FILTER -->
-
-    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
-
+    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5 border border-slate-100">
         <div class="grid grid-cols-2 gap-3">
-
-            <select
-                id="monthFilter"
-                class="p-3 border rounded-2xl"
-            >
-
-                <option value="">
-                    Tất cả tháng
-                </option>
-
+            <select id="monthFilter" class="p-3 border rounded-2xl bg-slate-50 outline-none text-sm">
+                <option value="">Tất cả tháng</option>
             </select>
-
-            <select
-                id="yearFilter"
-                class="p-3 border rounded-2xl"
-            >
-
-                <option value="">
-                    Tất cả năm
-                </option>
-
+            <select id="yearFilter" class="p-3 border rounded-2xl bg-slate-50 outline-none text-sm">
+                <option value="">Tất cả năm</option>
             </select>
-
         </div>
-
-        <button
-            id="applyFilterBtn"
-            class="w-full bg-indigo-500 text-white p-3 rounded-2xl mt-4 font-bold"
-        >
+        <button id="applyFilterBtn" class="w-full bg-slate-900 text-white p-3 rounded-2xl mt-4 font-bold active:scale-95 transition">
             Lọc thống kê
         </button>
-
     </div>
-
-    <!-- CHART -->
 
     <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
-
-        <h3 class="font-bold text-lg mb-4">
-            Biểu đồ chi tiêu
-        </h3>
-
-        <canvas id="statsChart"></canvas>
-
+        <h3 class="font-bold text-lg mb-4">Cơ cấu chi tiêu</h3>
+        <canvas id="statsChart" style="max-height: 250px;"></canvas>
     </div>
-
-    <!-- CATEGORY -->
 
     <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
-
-        <h3 class="font-bold text-lg mb-4">
-            Theo danh mục
-        </h3>
-
-        <div id="categoryStats"></div>
-
+        <h3 class="font-bold text-lg mb-4">Theo danh mục</h3>
+        <div id="categoryStats" class="space-y-4"></div>
     </div>
-
-    <!-- HISTORY -->
 
     <div class="bg-white p-5 rounded-3xl shadow-sm">
-
-        <h3 class="font-bold text-lg mb-4">
-            Lịch sử giao dịch
-        </h3>
-
-        <div id="historyList"></div>
-
+        <h3 class="font-bold text-lg mb-4">Chi tiết giao dịch</h3>
+        <div id="historyList" class="divide-y divide-slate-50"></div>
     </div>
-
 </div>
 
 <script type="module">
-
 import { supabase } from './js/supabase.js'
 import { formatMoney } from './js/utils.js'
 
@@ -186,310 +79,154 @@ const categories = {
     other: 'Khác'
 }
 
+const catColors = {
+    food: '#fbbf24',
+    transport: '#3b82f6',
+    shopping: '#ec4899',
+    bills: '#ef4444',
+    other: '#94a3b8'
+}
+
 async function init() {
-
-    const {
-        data: { session }
-    } = await supabase.auth.getSession()
-
+    const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
-
         window.location.href = './auth.html'
         return
     }
-
     user = session.user
-
     await loadExpenses()
-
     renderFilters()
-
     renderStats(expenses)
 
-    document
-        .getElementById('applyFilterBtn')
-        .addEventListener(
-            'click',
-            applyFilters
-        )
+    document.getElementById('applyFilterBtn').addEventListener('click', applyFilters)
 }
 
 async function loadExpenses() {
-
     const { data } = await supabase
         .from('expenses')
         .select('*')
         .eq('user_id', user.id)
         .is('deleted_at', null)
-        .order('expense_date', {
-            ascending: false
-        })
+        .order('expense_date', { ascending: false })
 
     expenses = data || []
 }
 
 function renderFilters() {
-
-    const monthSelect =
-        document.getElementById('monthFilter')
-
-    const yearSelect =
-        document.getElementById('yearFilter')
+    const monthSelect = document.getElementById('monthFilter')
+    const yearSelect = document.getElementById('yearFilter')
 
     for (let i = 1; i <= 12; i++) {
-
-        monthSelect.innerHTML += `
-            <option value="${i}">
-                Tháng ${i}
-            </option>
-        `
+        monthSelect.innerHTML += `<option value="${i}">Tháng ${i}</option>`
     }
 
-    const years =
-        [...new Set(
-            expenses.map(e =>
-                new Date(e.expense_date)
-                    .getFullYear()
-            )
-        )]
-
+    const years = [...new Set(expenses.map(e => new Date(e.expense_date).getFullYear()))].sort((a,b) => b-a)
     years.forEach(y => {
-
-        yearSelect.innerHTML += `
-            <option value="${y}">
-                ${y}
-            </option>
-        `
+        yearSelect.innerHTML += `<option value="${y}">${y}</option>`
     })
 }
 
 function applyFilters() {
+    const month = document.getElementById('monthFilter').value
+    const year = document.getElementById('yearFilter').value
 
-    const month =
-        document.getElementById('monthFilter')
-            .value
-
-    const year =
-        document.getElementById('yearFilter')
-            .value
-
-    let filtered = [...expenses]
-
-    if (month) {
-
-        filtered = filtered.filter(e => {
-
-            return (
-                new Date(e.expense_date)
-                    .getMonth() + 1
-            ) == month
-        })
-    }
-
-    if (year) {
-
-        filtered = filtered.filter(e => {
-
-            return (
-                new Date(e.expense_date)
-                    .getFullYear()
-            ) == year
-        })
-    }
+    let filtered = expenses.filter(e => {
+        const d = new Date(e.expense_date);
+        const mMatch = month ? (d.getMonth() + 1) == month : true;
+        const yMatch = year ? d.getFullYear() == year : true;
+        return mMatch && yMatch;
+    });
 
     renderStats(filtered)
 }
 
 function renderStats(list) {
-
-    const total =
-        list.reduce(
-            (sum, e) => sum + e.amount,
-            0
-        )
-
-    document.getElementById(
-        'totalSpent'
-    ).innerText = formatMoney(total)
-
-    document.getElementById(
-        'totalExpenses'
-    ).innerText = list.length
+    const total = list.reduce((sum, e) => sum + Number(e.amount), 0)
+    document.getElementById('totalSpent').innerText = formatMoney(total)
+    document.getElementById('totalExpenses').innerText = list.length
 
     renderHistory(list)
-
-    renderCategoryStats(list)
-
+    renderCategoryStats(list, total)
     renderChart(list)
 }
 
 function renderHistory(list) {
-
-    const container =
-        document.getElementById('historyList')
-
+    const container = document.getElementById('historyList')
     if (!list.length) {
-
-        container.innerHTML = `
-            <div class="text-center text-slate-400 py-10">
-                Không có dữ liệu
-            </div>
-        `
-
+        container.innerHTML = `<div class="text-center text-slate-400 py-10">Không có dữ liệu</div>`
         return
     }
 
-    container.innerHTML =
-        list.map(exp => {
-
-            return `
-                <div class="border-b py-4">
-
-                    <div class="flex justify-between">
-
-                        <div>
-
-                            <p class="font-bold">
-                                ${exp.name}
-                            </p>
-
-                            <p class="text-sm text-slate-500">
-                                ${categories[exp.category] || 'Khác'}
-                            </p>
-
-                        </div>
-
-                        <b class="text-rose-500">
-                            -${formatMoney(exp.amount)}
-                        </b>
-
-                    </div>
-
-                    <p class="text-xs text-slate-400 mt-2">
-                        ${exp.expense_date}
-                    </p>
-
+    container.innerHTML = list.map(exp => `
+        <div class="py-4">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="font-bold text-slate-800">${exp.name}</p>
+                    <p class="text-xs text-slate-500 uppercase font-medium">${categories[exp.category] || 'Khác'}</p>
                 </div>
-            `
-        }).join('')
+                <b class="text-rose-500">-${formatMoney(exp.amount)}</b>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">${new Date(exp.expense_date).toLocaleDateString('vi-VN')}</p>
+        </div>
+    `).join('')
 }
 
-function renderCategoryStats(list) {
-
+function renderCategoryStats(list, total) {
     const grouped = {}
-
     list.forEach(exp => {
-
-        grouped[exp.category] =
-            (grouped[exp.category] || 0)
-            + exp.amount
+        grouped[exp.category] = (grouped[exp.category] || 0) + Number(exp.amount)
     })
 
-    const container =
-        document.getElementById('categoryStats')
-
-    container.innerHTML =
-        Object.entries(grouped)
+    const container = document.getElementById('categoryStats')
+    container.innerHTML = Object.entries(grouped)
+        .sort((a, b) => b[1] - a[1])
         .map(([key, value]) => {
-
+            const percent = total > 0 ? Math.round((value / total) * 100) : 0
             return `
-                <div class="mb-4">
-
-                    <div class="flex justify-between mb-1">
-
-                        <span>
-                            ${categories[key] || 'Khác'}
-                        </span>
-
-                        <b>
-                            ${formatMoney(value)}
-                        </b>
-
+                <div>
+                    <div class="flex justify-between mb-1 text-sm">
+                        <span class="font-medium text-slate-600">${categories[key] || 'Khác'}</span>
+                        <span class="font-bold">${formatMoney(value)} (${percent}%)</span>
                     </div>
-
-                    <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
-
-                        <div
-                            class="bg-indigo-500 h-full"
-                            style="
-                                width:
-                                ${
-                                    (
-                                        value /
-                                        Math.max(
-                                            1,
-                                            list.reduce(
-                                                (s, e) => s + e.amount,
-                                                0
-                                            )
-                                        )
-                                    ) * 100
-                                }%
-                            "
-                        ></div>
-
+                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full" style="width: ${percent}%; background-color: ${catColors[key] || '#94a3b8'}"></div>
                     </div>
-
                 </div>
             `
         }).join('')
 }
 
 function renderChart(list) {
-
     const grouped = {}
-
     list.forEach(exp => {
-
-        grouped[exp.category] =
-            (grouped[exp.category] || 0)
-            + exp.amount
+        grouped[exp.category] = (grouped[exp.category] || 0) + Number(exp.amount)
     })
 
-    const ctx =
-        document.getElementById('statsChart')
+    const ctx = document.getElementById('statsChart')
+    if (window.statsChartInstance) window.statsChartInstance.destroy()
 
-    if (window.statsChart) {
-
-        window.statsChart.destroy()
-    }
-
-    window.statsChart =
-        new Chart(ctx, {
-
-            type: 'doughnut',
-
-            data: {
-
-                labels:
-                    Object.keys(grouped)
-                    .map(
-                        k => categories[k]
-                    ),
-
-                datasets: [{
-                    data:
-                        Object.values(grouped)
-                }]
+    window.statsChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(grouped).map(k => categories[k] || 'Khác'),
+            datasets: [{
+                data: Object.values(grouped),
+                backgroundColor: Object.keys(grouped).map(k => catColors[k] || '#94a3b8'),
+                borderWidth: 0,
+                hoverOffset: 20
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
             },
-
-            options: {
-
-                responsive: true,
-
-                plugins: {
-
-                    legend: {
-                        position: 'bottom'
-                    }
-                }
-            }
-        })
+            cutout: '65%'
+        }
+    })
 }
 
 init()
-
 </script>
-
 </body>
 </html>
