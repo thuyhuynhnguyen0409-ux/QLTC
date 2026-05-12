@@ -1,63 +1,34 @@
-import { supabase }
-from './supabase.js'
+// js/auth.js
+import { supabase } from './supabase.js'; // Vì cùng nằm trong thư mục js/
 
 export async function loginWithEmail(email) {
-
     try {
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                // Đảm bảo URL này đã được thêm vào Redirect URLs trong Supabase Dashboard
+                emailRedirectTo: window.location.origin + '/index.html'
+            }
+        });
 
-        const { error } =
-            await supabase.auth.signInWithOtp({
-
-                email,
-
-                options: {
-
-                    emailRedirectTo:
-                        'https://qltc-tawny.vercel.app/index.html'
-                }
-            })
-
-        if (error) {
-
-            console.error(error)
-
-            alert(error.message)
-
-            return
-        }
-
-        alert(
-            'Đã gửi link đăng nhập.\nVui lòng kiểm tra email.'
-        )
-
+        if (error) throw error;
+        alert('Đã gửi link đăng nhập thành công! Vui lòng kiểm tra hộp thư đến (hoặc Spam).');
     } catch (err) {
-
-        console.error(err)
-
-        alert('Không thể gửi email')
+        console.error("Lỗi đăng nhập:", err);
+        alert('Lỗi: ' + err.message);
     }
 }
 
 export async function logout() {
     await supabase.auth.signOut();
-    localStorage.clear(); // Xóa sạch state cũ
     window.location.href = './auth.html';
 }
 
 export async function checkAuth() {
-
-    const {
-        data: { session }
-    } =
-        await supabase.auth.getSession()
-
+    const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-
-        window.location.href =
-            './auth.html'
-
-        return null
+        window.location.href = './auth.html';
+        return null;
     }
-
-    return session.user
+    return session.user;
 }

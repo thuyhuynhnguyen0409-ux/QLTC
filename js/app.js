@@ -1,33 +1,32 @@
+// js/app.js
 import { checkAuth, logout } from './auth.js';
 import { loadSettings } from './settings.js';
 import { loadTodayBudget } from './budget.js';
 import { updateHomeUI } from './ui.js';
-import { addExpense } from './expenses.js';
+
+// Gán hàm vào window để HTML có thể gọi được qua onclick
+window.logout = logout;
+window.toggleConfigModal = (show) => {
+    const modal = document.getElementById('configModal');
+    if (show) modal.classList.remove('hidden');
+    else modal.classList.add('hidden');
+};
 
 async function init() {
     const user = await checkAuth();
     if (!user) return;
 
-    await loadSettings();
-    loadTodayBudget();
-    updateHomeUI();
-}
+    // Hiển thị email user ngay lập tức
+    const emailDisplay = document.getElementById('userEmailDisplay');
+    if (emailDisplay) emailDisplay.innerText = user.email;
 
-// Gán hàm vào window để gọi được từ HTML onclick
-window.logout = logout;
-window.addExpense = async () => {
-    const name = document.getElementById('expName').value;
-    const amount = document.getElementById('expAmount').value;
-    const cat = document.getElementById('expCategory').value;
-    if(name && amount) {
-        await addExpense(name, amount, cat);
-        document.getElementById('expName').value = '';
-        document.getElementById('expAmount').value = '';
+    try {
+        await loadSettings();
+        await loadTodayBudget();
+        updateHomeUI();
+    } catch (error) {
+        console.error("Lỗi khởi tạo dữ liệu:", error);
     }
-};
-
-window.toggleConfigModal = (show) => {
-    document.getElementById('configModal').classList.toggle('hidden', !show);
-};
+}
 
 init();
