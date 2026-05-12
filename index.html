@@ -1,485 +1,101 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Finance Master AI - Home Chef Edition</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/env.js"></script>
-    <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-    const env = window.ENV || {};
-    const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
-    const apiKeyGemini = env.VITE_GEMINI_API_KEY;
+<meta charset="UTF-8">
 
-    let user = null, expenses = [], currentCycle = null, todayBudget = null, settings = {};
-    let chartInstance = null;
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+/>
 
-    // --- KHỞI TẠO APP ---
-    async function initApp() {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-            user = data.session.user;
-            await loadAllData();
-            showSection('dashboard');
-        } else {
-            document.getElementById('loginSection').classList.remove('hidden');
-        }
-    }
+<title>
+Finance AI
+</title>
 
-    async function loadAllData() {
-        // 1. Lấy Settings
-        const { data: sData } = await supabase.from('settings').select('*').eq('user_id', user.id).maybeSingle();
-        if (!sData) return showSection('setupPrompt');
-        settings = sData;
+<script src="https://cdn.tailwindcss.com"></script>
 
-        // 2. Chốt ngày cũ nếu có (Chuyển dư vào tiết kiệm / Chia đều số âm)
-        await processPastDays();
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        // 3. Lấy chu kỳ và ngân sách hôm nay
-        const todayStr = new Date().toISOString().split('T')[0];
-        const { data: cData } = await supabase.from('monthly_cycles').select('*')
-            .eq('user_id', user.id).eq('is_closed', false)
-            .lte('cycle_start', todayStr).gte('cycle_end', todayStr).maybeSingle();
+<link
+    rel="stylesheet"
+    href="./css/style.css"
+/>
 
-        if (!cData) { await generateNewCycle(); return loadAllData(); }
-        currentCycle = cData;
-
-        const { data: bData } = await supabase.from('daily_budgets').select('*')
-            .eq('user_id', user.id).eq('budget_date', todayStr).maybeSingle();
-        todayBudget = bData;
-
-        // 4. Lấy danh sách chi tiêu
-        const { data: eData } = await supabase.from('expenses').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10);
-        expenses = eData || [];
-
-        updateUI();
-    }
-
-    // --- THUẬT TOÁN CHỐT NGÀY ---
-    async function processPastDays() {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const { data: pastDays } = await supabase.from('daily_budgets')
-            .select('*').eq('user_id', user.id).lt('budget_date', todayStr).eq('is_processed', false);
-
-        if (pastDays && pastDays.length > 0) {
-            for (let day of pastDays) {
-                if (day.remaining > 0) {
-                    // Dư tiền -> Cộng vào hũ tiết kiệm (Database: current_savings)
-                    const newSavings = settings.current_savings + day.remaining;
-                    await supabase.from('settings').update({ current_savings: newSavings }).eq('user_id', user.id);
-                    settings.current_savings = newSavings;
-                } else if (day.remaining < 0) {
-                    // Âm tiền -> Chia đều cho các ngày còn lại trong chu kỳ
-                    await redistributeDeficit(day.remaining, day.budget_date);
-                }
-                await supabase.from('daily_budgets').update({ is_processed: true }).eq('id', day.id);
-            }
-        }
-    }
-
-    async function redistributeDeficit(deficit, fromDate) {
-        const { data: futureDays } = await supabase.from('daily_budgets')
-            .select('*').eq('user_id', user.id).gt('budget_date', fromDate).eq('is_processed', false);
-        
-        if (futureDays && futureDays.length > 0) {
-            const split = Math.floor(deficit / futureDays.length);
-            for (let d of futureDays) {
-                await supabase.from('daily_budgets').update({ 
-                    allocated: d.allocated + split, 
-                    remaining: d.remaining + split 
-                }).eq('id', d.id);
-            }
-        }
-    }
-
-    // --- NHẬP CHI TIÊU (FIX LỖI KHÔNG HIỆN SỐ ÂM) ---
-    window.addExpense = async () => {
-        const name = document.getElementById('expName').value;
-        const amount = window.parseCurrency(document.getElementById('expAmount').value);
-        if (!name || !amount) return;
-
-        const newRemaining = todayBudget.remaining - amount;
-
-        // Lưu Database trước
-        await supabase.from('expenses').insert({
-            user_id: user.id, daily_budget_id: todayBudget.id,
-            name, amount, category: 'Chi tiêu', expense_date: new Date().toISOString().split('T')[0]
-        });
-
-        await supabase.from('daily_budgets').update({
-            spent: todayBudget.spent + amount,
-            remaining: newRemaining
-        }).eq('id', todayBudget.id);
-
-        // Hiển thị ngay lập tức kể cả âm
-        todayBudget.remaining = newRemaining;
-        updateUI();
-
-        document.getElementById('expName').value = ''; 
-        document.getElementById('expAmount').value = '';
-    };
-
-    // --- THỐNG KÊ (FIX LỖI KHÔNG SỬ DỤNG ĐƯỢC) ---
-    window.showAnalytics = () => {
-        document.getElementById('analyticsSection').classList.remove('hidden');
-        window.filterStats('day');
-    };
-
-    window.filterStats = async (mode) => {
-        const now = new Date();
-        let start = new Date();
-        if(mode === 'day') start.setHours(0,0,0,0);
-        else if(mode === 'month') start = new Date(now.getFullYear(), now.getMonth(), 1);
-        else start = new Date(now.getFullYear(), 0, 1);
-
-        const { data: list } = await supabase.from('expenses')
-            .select('*').eq('user_id', user.id)
-            .gte('expense_date', start.toISOString().split('T')[0]);
-
-        const total = list.reduce((s, e) => s + e.amount, 0);
-        document.getElementById('statsTotal').innerText = window.formatMoney(total);
-
-        // Vẽ biểu đồ
-        const cats = {};
-        list.forEach(e => cats[e.category] = (cats[e.category] || 0) + e.amount);
-        
-        const ctx = document.getElementById('analyticsChart').getContext('2d');
-        if (chartInstance) chartInstance.destroy();
-        chartInstance = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(cats),
-                datasets: [{ data: Object.values(cats), backgroundColor: ['#6366f1', '#10b981', '#f43f5e'] }]
-            },
-            options: { plugins: { legend: { position: 'bottom' } } }
-        });
-    };
-
-    // --- UI HELPERS ---
-    function updateUI() {
-        const remainEl = document.getElementById('todayBudgetText');
-        remainEl.innerText = window.formatMoney(todayBudget?.remaining || 0);
-        
-        // Fix: Nếu âm thì đổi màu đỏ
-        if (todayBudget?.remaining < 0) {
-            remainEl.classList.add('text-rose-400');
-            remainEl.classList.remove('text-white');
-        } else {
-            remainEl.classList.remove('text-rose-400');
-            remainEl.classList.add('text-white');
-        }
-
-        document.getElementById('savingsDisplay').innerText = window.formatMoney(settings.current_savings);
-        
-        document.getElementById('expenseList').innerHTML = expenses.map(e => `
-            <div class="flex justify-between items-center p-4 bg-white rounded-2xl shadow-sm">
-                <div><p class="font-bold text-sm">${e.name}</p></div>
-                <p class="font-black text-rose-500 text-sm">-${window.formatMoney(e.amount)}</p>
-            </div>`).join('');
-    }
-
-    window.closeAnalytics = () => document.getElementById('analyticsSection').classList.add('hidden');
-    window.formatMoney = (a) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(a || 0);
-    window.parseCurrency = (s) => parseInt(s.toString().replace(/\D/g, '')) || 0;
-    window.formatCurrencyInput = (i) => {
-        let v = i.value.replace(/\D/g, '');
-        i.value = v ? new Intl.NumberFormat('vi-VN').format(v) : '';
-    };
-
-    initApp();
-</script>
-
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* Bo tròn cực đại cho giao diện hiện đại */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 0px;
-            background: transparent;
-        }
-
-        /* Hiệu ứng mượt mà khi chuyển đổi modal */
-        .animate-in {
-            animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                transform: translateY(100%);
-            }
-
-            to {
-                transform: translateY(0);
-            }
-        }
-
-        .hidden {
-            display: none;
-        }
-    </style>
 </head>
 
-<body class="bg-[#F8FAFC] pb-10">
-    <div id="loginSection" class="hidden flex flex-col items-center justify-center min-h-screen p-6 text-center">
-        <div
-            class="w-24 h-24 bg-indigo-600 rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-indigo-100 mb-8">
-            <span class="text-4xl">💰</span>
-        </div>
-        <h1 class="text-3xl font-black tracking-tight mb-2">Finance Master</h1>
-        <p class="text-slate-400 font-medium mb-12">Quản lý tài chính & Gợi ý nấu ăn AI</p>
-        <button onclick="window.signInWithGoogle()"
-            class="w-full max-w-xs bg-white border border-slate-200 text-slate-700 py-4 rounded-3xl font-bold flex items-center justify-center gap-3 shadow-sm active:scale-95 transition-all">
-            <img src="https://www.google.com/favicon.ico" class="w-5 h-5">
-            Tiếp tục với Google
-        </button>
-    </div>
+<body class="bg-slate-100">
 
-    <div id="appSection" class="hidden max-w-md mx-auto min-h-screen">
-        <header class="p-6 flex justify-between items-center bg-[#F8FAFC]/80 backdrop-blur-md sticky top-0 z-30">
-            <div class="flex items-center gap-3">
-                <img id="userAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky"
-                    class="w-12 h-12 rounded-2xl bg-white shadow-sm border border-slate-100">
-                <div>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chào mừng</p>
-                    <h2 id="userName" class="font-bold text-slate-800">Người dùng</h2>
-                </div>
-            </div>
-            <button onclick="window.showAnalytics()"
-                class="p-4 bg-white rounded-3xl shadow-sm border border-slate-50 flex flex-col items-center gap-2 active:scale-95 transition-all">
-                <span class="text-2xl">📊</span>
-                <span class="text-[10px] font-black text-slate-400 uppercase">Thống kê</span>
-            </button>
-            <button onclick="window.toggleConfigModal(true)"
-                class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-slate-600 active:scale-90 transition-all">
-                ⚙️
-            </button>
+<div class="max-w-md mx-auto p-4">
 
-        </header>
+<h1 class="text-3xl font-bold mb-4">
+Finance AI
+</h1>
 
-        <div id="setupPrompt" class="hidden p-6 text-center space-y-6">
-            <div class="py-12 bg-white rounded-[3rem] shadow-sm border border-slate-100">
-                <div class="text-5xl mb-4">🚀</div>
-                <h3 class="text-xl font-bold px-8">Bắt đầu hành trình tài chính</h3>
-                <p class="text-slate-400 text-sm mt-2 px-8">Thiết lập thu nhập để AI giúp bạn phân bổ chi tiêu hàng
-                    ngày.</p>
-                <button onclick="window.toggleConfigModal(true)"
-                    class="mt-8 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-indigo-100 active:scale-95 transition-all">
-                    Cấu hình ngay
-                </button>
-            </div>
-        </div>
+<div class="bg-white p-5 rounded-3xl">
 
-        <div id="dashboard" class="hidden p-6 space-y-6">
-            <div
-                class="relative bg-indigo-600 rounded-[3rem] p-8 text-white overflow-hidden shadow-2xl shadow-indigo-200/50">
-                <div class="relative z-10 flex justify-between items-center">
-                    <div class="space-y-6">
-                        <div>
-                            <p class="text-indigo-100/80 text-[10px] font-black uppercase tracking-[0.2em]">Hôm nay bạn
-                                còn</p>
-                            <h3 id="todayBudgetText" class="text-4xl font-black mt-1">0đ</h3>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4 pt-4 border-t border-indigo-500/30">
-                            <div>
-                                <p class="text-indigo-100/60 text-[10px] font-black uppercase tracking-widest">Thu nhập
-                                </p>
-                                <p id="salaryDisplay" class="font-bold text-sm">0đ</p>
-                            </div>
-                            <div>
-                                <p class="text-indigo-100/60 text-[10px] font-black uppercase tracking-widest">Tích lũy
-                                </p>
-                                <p id="savingsDisplay" class="font-bold text-sm text-emerald-300">0đ</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="w-24 h-24 flex items-center justify-center bg-indigo-500/20 rounded-full">
-                        <canvas id="mainChart"></canvas>
-                    </div>
-                </div>
-            </div>
+<p class="text-slate-500">
+Chi tiêu hôm nay
+</p>
 
-            <div class="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-50 space-y-4">
-                <div class="flex items-center justify-between px-2">
-                    <h3 class="font-bold text-slate-800">Ghi chép chi tiêu</h3>
-                    <span class="text-[10px] font-black text-indigo-500 uppercase">Hôm nay</span>
-                </div>
-                <div class="flex gap-2">
-                    <input type="text" id="expName" placeholder="Tên món (vd: Ăn trưa)"
-                        class="flex-1 p-4 bg-slate-50 rounded-2xl outline-none text-sm border border-transparent focus:border-indigo-100 transition-all">
-                    <input type="text" id="expAmount" placeholder="Số tiền" oninput="window.formatCurrencyInput(this)"
-                        class="w-1/3 p-4 bg-slate-50 rounded-2xl outline-none text-sm font-bold text-rose-500 border border-transparent focus:border-rose-100 transition-all">
-                </div>
-                <button onclick="window.addExpense()"
-                    class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-indigo-100 active:scale-95 transition-all">
-                    Lưu chi tiêu
-                </button>
-            </div>
+<h2
+    id="dailyBudget"
+    class="text-4xl font-black"
+>
+0đ
+</h2>
 
-            <div class="bg-orange-50 rounded-[2.5rem] p-6 border border-orange-100/50">
-                <div class="flex items-center gap-3 mb-4">
-                    <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">👨‍🍳</div>
-                    <h3 class="font-bold text-orange-900">AI Home Chef</h3>
-                </div>
-                <div id="aiChefContent"
-                    class="mb-4 min-h-[60px] bg-white/50 rounded-2xl p-4 flex items-center justify-center">
-                    <p class="text-orange-700/70 text-xs italic text-center text-pretty">Nhấn để AI gợi ý mâm cơm tiết
-                        kiệm hôm nay!</p>
-                </div>
-                <button id="suggestBtn" onclick="window.suggestFood()"
-                    class="w-full py-3 bg-orange-500 text-white rounded-xl font-black text-xs shadow-md shadow-orange-200 active:scale-95 transition-all">
-                    Gợi ý mâm cơm AI
-                </button>
-            </div>
+</div>
 
-            <div class="space-y-4">
-                <h3 class="font-black text-slate-800 px-2 text-sm uppercase tracking-widest">Chi tiêu gần đây</h3>
-                <div id="expenseList" class="space-y-3">
-                </div>
-            </div>
+<div class="mt-5 bg-white p-5 rounded-3xl">
 
-            <div class="space-y-4">
-                <h3 class="font-black text-slate-800 px-2 text-sm uppercase tracking-widest">Mục tiêu của bạn</h3>
-                <div id="goalList" class="space-y-3">
-                </div>
-            </div>
-        </div>
-    </div>
+<input
+    id="expName"
+    class="w-full p-3 border rounded-xl mb-3"
+    placeholder="Tên khoản chi"
+/>
 
-    <div id="configModal"
-        class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-        <div
-            class="w-full max-w-lg bg-white rounded-[3rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
-            <div class="flex justify-between items-center mb-8">
-                <h3 class="text-2xl font-black tracking-tight">Thiết lập tài chính</h3>
-                <button onclick="window.toggleConfigModal(false)"
-                    class="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-400">✕</button>
-            </div>
+<input
+    id="expAmount"
+    class="w-full p-3 border rounded-xl mb-3"
+    placeholder="Số tiền"
+/>
 
-            <div class="space-y-6 max-h-[60vh] overflow-y-auto px-1 custom-scrollbar">
-                <div class="grid grid-cols-1 gap-4">
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng thu nhập
-                            tháng</label>
-                        <input type="text" id="salaryInput" oninput="window.formatCurrencyInput(this)"
-                            class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold focus:bg-white focus:ring-2 ring-indigo-50 transition-all">
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ngày
-                                lương</label>
-                            <input type="number" id="paydayInput" min="1" max="31"
-                                class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tích lũy
-                                (VND)</label>
-                            <input type="text" id="savingsInput" oninput="window.formatCurrencyInput(this)"
-                                class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quỹ hưởng
-                            thụ</label>
-                        <input type="text" id="enjoymentInput" oninput="window.formatCurrencyInput(this)"
-                            class="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold">
-                    </div>
-                </div>
+<select
+    id="expCategory"
+    class="w-full p-3 border rounded-xl mb-3"
+>
 
-                <div class="space-y-4 pt-6 border-t border-slate-100">
-                    <div class="flex justify-between items-center">
-                        <h4 class="font-bold text-sm">Khoản phí cố định hàng tháng</h4>
-                        <button onclick="window.addFixedCostRow()"
-                            class="text-indigo-600 text-xs font-black uppercase tracking-wider">+ Thêm phí</button>
-                    </div>
-                    <div id="fixedCostsList" class="space-y-2">
-                    </div>
-                </div>
-            </div>
+<option value="food">
+Ăn uống
+</option>
 
-            <button onclick="window.initBudget()"
-                class="w-full mt-8 bg-indigo-600 text-white py-5 rounded-[1.5rem] font-black shadow-lg shadow-indigo-100 active:scale-95 transition-all">
-                Lưu và Khởi tạo chu kỳ
-            </button>
-        </div>
-    </div>
-    <div id="analyticsModal" class="hidden fixed inset-0 z-[70] bg-white overflow-y-auto">
-        <div class="max-w-md mx-auto min-h-screen flex flex-col">
-            <div class="p-6 flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-md">
-                <h3 class="text-2xl font-black">Thống kê chi tiết</h3>
-                <button onclick="window.closeAnalytics()"
-                    class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold">✕</button>
-            </div>
+<option value="transport">
+Di chuyển
+</option>
 
-            <div class="p-6 space-y-8">
-                <div class="flex bg-slate-100 p-1 rounded-2xl">
-                    <button onclick="window.filterStats('day')" id="tab-day"
-                        class="flex-1 py-2 rounded-xl text-xs font-bold bg-white shadow-sm">Ngày</button>
-                    <button onclick="window.filterStats('month')" id="tab-month"
-                        class="flex-1 py-2 rounded-xl text-xs font-bold text-slate-500">Tháng</button>
-                    <button onclick="window.filterStats('year')" id="tab-year"
-                        class="flex-1 py-2 rounded-xl text-xs font-bold text-slate-500">Năm</button>
-                </div>
+</select>
 
-                <div class="bg-indigo-600 rounded-[2.5rem] p-8 text-white shadow-xl">
-                    <p id="statsPeriod" class="text-[10px] font-black uppercase tracking-widest opacity-70">Tổng chi
-                        tiêu hôm nay</p>
-                    <h2 id="statsTotal" class="text-3xl font-black mt-2">0đ</h2>
-                </div>
+<button
+    onclick="addExpense()"
+    class="w-full bg-indigo-500 text-white p-4 rounded-2xl"
+>
+Thêm chi tiêu
+</button>
 
-                <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
-                    <h4 class="font-bold text-sm mb-4">Cơ cấu chi tiêu</h4>
-                    <canvas id="analyticsChart" height="250"></canvas>
-                </div>
+</div>
 
-                <div class="space-y-4">
-                    <h4 class="font-bold text-sm">Chi tiết giao dịch</h4>
-                    <div id="statsList" class="space-y-3">
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div id="analyticsSection" class="hidden fixed inset-0 z-[100] bg-[#F8FAFC] flex flex-col overflow-y-auto">
-        <div
-            class="p-6 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100">
-            <button onclick="window.closeAnalytics()"
-                class="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-600">
-                ←
-            </button>
-            <h3 class="text-lg font-black uppercase tracking-widest">Thống kê chi tiết</h3>
-            <div class="w-10"></div>
-        </div>
+<canvas
+    id="mainChart"
+    class="mt-5"
+></canvas>
 
-        <div class="p-6 space-y-6">
-            <div class="flex bg-slate-200/50 p-1 rounded-2xl">
-                <button onclick="window.filterStats('day')" id="btnDay"
-                    class="flex-1 py-3 rounded-xl text-xs font-bold bg-white shadow-sm transition-all">Ngày</button>
-                <button onclick="window.filterStats('month')" id="btnMonth"
-                    class="flex-1 py-3 rounded-xl text-xs font-bold text-slate-500 transition-all">Tháng</button>
-                <button onclick="window.filterStats('year')" id="btnYear"
-                    class="flex-1 py-3 rounded-xl text-xs font-bold text-slate-500 transition-all">Năm</button>
-            </div>
+</div>
 
-            <div class="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-50">
-                <canvas id="analyticsChart" class="max-h-[300px]"></canvas>
-            </div>
+<script
+    type="module"
+    src="./js/app.js"
+></script>
 
-            <div class="space-y-4">
-                <h4 class="font-black text-slate-800 text-sm uppercase tracking-widest px-2">Chi tiết giao dịch</h4>
-                <div id="statsList" class="space-y-3">
-                </div>
-            </div>
-        </div>
-    </div>
 </body>
-
 </html>
