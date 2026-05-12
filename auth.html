@@ -28,31 +28,26 @@
         </div>
     </div>
 
-    <script type="module">
-        import { loginWithEmail } from '/js/auth.js';
+<script type="module">
+import { loginWithEmail } from '/js/auth.js'; // Sửa dấu chấm thành gạch chéo /
 
-        document.getElementById('loginBtn').addEventListener('click', async () => {
-        const email = document.getElementById('email').value.trim();
-        if (!email) {
-            alert('Vui lòng nhập email');
-            return;
-        }
+document.getElementById('loginBtn').addEventListener('click', async () => {
+    const email = document.getElementById('email').value.trim();
+    if (!email) {
+        alert('Vui lòng nhập email');
+        return;
+    }
+    
+    const btn = document.getElementById('loginBtn');
+    btn.innerText = 'Đang gửi link...';
+    btn.disabled = true;
 
-        const btn = document.getElementById('loginBtn');
-        const originalText = btn.innerText;
-        
-        try {
-            btn.innerText = 'Đang gửi...';
-            btn.disabled = true;
-            await loginWithEmail(email);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            btn.innerText = originalText;
-            btn.disabled = false;
-        }
-    });
-    </script>
+    await loginWithEmail(email);
+    
+    btn.innerText = 'Gửi link đăng nhập';
+    btn.disabled = false;
+});
+</script>
 </body>
 
 </html>
