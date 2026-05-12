@@ -1,28 +1,17 @@
-import { createClient }
+
+import {
+    createClient
+}
 from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
 const SUPABASE_URL =
-'YOUR_URL'
+    'https://mojulicyvkrwoxbjpsem.supabase.co'
 
 const SUPABASE_ANON_KEY =
-'YOUR_KEY'
+    'YOUR_ANON_KEY'
 
 export const supabase =
-createClient(
-
-    SUPABASE_URL,
-
-    SUPABASE_ANON_KEY,
-
-    {
-
-        auth: {
-
-            persistSession: true,
-
-            autoRefreshToken: true,
-
-            detectSessionInUrl: false
-        }
-    }
-)
+    createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+    )

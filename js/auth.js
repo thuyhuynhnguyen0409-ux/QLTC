@@ -1,41 +1,58 @@
-import { supabase } from './supabase.js'
-import { setUser } from './state.js'
 
-window.logout = async () => {
+import { supabase }
+from './supabase.js'
+
+import { setUser }
+from './state.js'
+
+export async function loginWithEmail(email) {
+
+    try {
+
+        const { error } =
+            await supabase.auth.signInWithOtp({
+
+                email,
+
+                options: {
+
+                    emailRedirectTo:
+                        'https://qltc-tawny.vercel.app'
+                }
+            })
+
+        if (error) {
+
+            console.error(error)
+
+            alert(error.message)
+
+            return false
+        }
+
+        return true
+
+    } catch (err) {
+
+        console.error(err)
+
+        alert('Không thể gửi email')
+
+        return false
+    }
+}
+
+export async function logout() {
 
     await supabase.auth.signOut()
 
     localStorage.clear()
+
     sessionStorage.clear()
 
-    window.location.replace('/auth.html')
-}
-
-export async function loginWithEmail(email) {
-
-    const { error } =
-        await supabase.auth.signInWithOtp({
-
-            email,
-
-            options: {
-
-                emailRedirectTo:
-                    'https://qltc-tawny.vercel.app'
-            }
-        })
-
-    if (error) {
-
-        alert(error.message)
-        return false
-    }
-
-    alert(
-        'Đã gửi link đăng nhập tới email'
+    window.location.replace(
+        './auth.html'
     )
-
-    return true
 }
 
 export async function checkAuth() {
@@ -53,14 +70,15 @@ export async function checkAuth() {
         ) {
 
             window.location.replace(
-                '/auth.html'
+                './auth.html'
             )
         }
 
-        return false
+        return null
     }
 
     setUser(session.user)
 
-    return true
+    return session.user
 }
+

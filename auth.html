@@ -134,14 +134,11 @@ const btn =
         'loginBtn'
     )
 
-const msg =
-    document.getElementById(
-        'message'
-    )
-
 btn.addEventListener(
     'click',
     async () => {
+
+        console.log('CLICK')
 
         const email =
             document
@@ -151,9 +148,7 @@ btn.addEventListener(
 
         if (!email) {
 
-            alert(
-                'Vui lòng nhập email'
-            )
+            alert('Nhập email')
 
             return
         }
@@ -173,17 +168,9 @@ btn.addEventListener(
 
         if (success) {
 
-            msg.classList.remove(
-                'hidden'
+            alert(
+                'Đã gửi email đăng nhập.\nHãy kiểm tra hộp thư.'
             )
-
-            msg.innerHTML = `
-            
-            ✅ Đã gửi link đăng nhập.<br><br>
-
-            Vui lòng kiểm tra email để đăng nhập vào hệ thống.
-
-            `
         }
     }
 )
