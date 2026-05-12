@@ -13,7 +13,9 @@ import {
 import {
     updateHomeUI
 } from './ui.js'
+import { requireAuth } from './authGuard.js'
 
+const user = await requireAuth()
 async function init() {
 
     const loggedIn =

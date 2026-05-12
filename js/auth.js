@@ -1,9 +1,10 @@
 import { supabase }
-from './supabase.js'
+    from './supabase.js'
 
 import {
     setUser
 } from './state.js'
+
 
 window.logout = async () => {
 
@@ -12,9 +13,20 @@ window.logout = async () => {
 
     if (!confirmLogout) return
 
-    await supabase.auth.signOut()
+    const { error } =
+        await supabase.auth.signOut()
 
-    window.location.href = './auth.html'
+    if (error) {
+
+        alert('Logout thất bại')
+        return
+    }
+
+    localStorage.clear()
+
+    sessionStorage.clear()
+
+    window.location.replace('./auth.html')
 }
 export async function checkAuth() {
 
@@ -24,7 +36,7 @@ export async function checkAuth() {
             data: { session },
             error
         } =
-        await supabase.auth.getSession()
+            await supabase.auth.getSession()
 
         if (error) {
             console.error(error)
