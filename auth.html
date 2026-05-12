@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
 
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 
 <meta
     name="viewport"
@@ -11,57 +10,200 @@
 />
 
 <title>
-Đăng nhập
+Đăng nhập - Finance AI
 </title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 
+<link
+    rel="stylesheet"
+    href="./css/style.css"
+/>
+
 </head>
 
-<body class="bg-slate-100 flex items-center justify-center min-h-screen">
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-5">
 
-<div class="bg-white p-8 rounded-3xl w-full max-w-sm">
+<div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-sm">
 
-<h1 class="text-3xl font-black mb-6">
-Đăng nhập
-</h1>
+    <div class="text-center mb-6">
 
-<button
-    id="googleBtn"
-    class="w-full bg-black text-white p-4 rounded-2xl"
->
-Đăng nhập Google
-</button>
+        <h1 class="text-3xl font-black">
+            Finance AI
+        </h1>
+
+        <p class="text-slate-500 mt-2">
+            Quản lý chi tiêu thông minh
+        </p>
+
+    </div>
+
+    <!-- LOGIN -->
+
+    <div class="mb-5">
+
+        <h2 class="text-xl font-bold mb-4">
+            Đăng nhập
+        </h2>
+
+        <input
+            id="loginEmail"
+            type="email"
+            placeholder="Email"
+            class="w-full p-4 border rounded-2xl mb-3"
+        />
+
+        <input
+            id="loginPassword"
+            type="password"
+            placeholder="Mật khẩu"
+            class="w-full p-4 border rounded-2xl mb-4"
+        />
+
+        <button
+            id="loginBtn"
+            class="w-full bg-indigo-500 text-white p-4 rounded-2xl font-bold"
+        >
+            Đăng nhập
+        </button>
+
+    </div>
+
+    <!-- REGISTER -->
+
+    <div>
+
+        <h2 class="text-xl font-bold mb-4">
+            Đăng ký
+        </h2>
+
+        <input
+            id="registerEmail"
+            type="email"
+            placeholder="Email"
+            class="w-full p-4 border rounded-2xl mb-3"
+        />
+
+        <input
+            id="registerPassword"
+            type="password"
+            placeholder="Mật khẩu"
+            class="w-full p-4 border rounded-2xl mb-4"
+        />
+
+        <button
+            id="registerBtn"
+            class="w-full bg-slate-900 text-white p-4 rounded-2xl font-bold"
+        >
+            Đăng ký
+        </button>
+
+    </div>
 
 </div>
 
 <script type="module">
 
-import { createClient }
-from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+import { supabase } from './js/supabase.js'
 
-const supabase =
-    createClient(
-        'YOUR_SUPABASE_URL',
-        'YOUR_SUPABASE_ANON_KEY'
+const {
+    data: { session }
+} = await supabase.auth.getSession()
+
+if (session) {
+
+    window.location.href = './index.html'
+}
+
+document
+    .getElementById('loginBtn')
+    .addEventListener(
+        'click',
+        login
     )
 
 document
-.getElementById('googleBtn')
-.addEventListener('click', async () => {
+    .getElementById('registerBtn')
+    .addEventListener(
+        'click',
+        register
+    )
 
-    await supabase.auth.signInWithOAuth({
+async function login() {
 
-        provider: 'google',
+    const email =
+        document
+            .getElementById('loginEmail')
+            .value
+            .trim()
 
-        options: {
+    const password =
+        document
+            .getElementById('loginPassword')
+            .value
+            .trim()
 
-            redirectTo:
-                window.location.origin
-                + '/index.html'
-        }
+    if (!email || !password) {
+
+        alert('Nhập email và mật khẩu')
+        return
+    }
+
+    const {
+        error
+    } = await supabase.auth.signInWithPassword({
+
+        email,
+        password
     })
-})
+
+    if (error) {
+
+        alert(error.message)
+        return
+    }
+
+    window.location.href = './index.html'
+}
+
+async function register() {
+
+    const email =
+        document
+            .getElementById('registerEmail')
+            .value
+            .trim()
+
+    const password =
+        document
+            .getElementById('registerPassword')
+            .value
+            .trim()
+
+    if (!email || !password) {
+
+        alert('Nhập email và mật khẩu')
+        return
+    }
+
+    const {
+        error
+    } = await supabase.auth.signUp({
+
+        email,
+        password
+    })
+
+    if (error) {
+
+        alert(error.message)
+        return
+    }
+
+    alert(
+        'Đăng ký thành công. Hãy đăng nhập.'
+    )
+}
 
 </script>
 

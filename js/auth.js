@@ -5,6 +5,17 @@ import {
     setUser
 } from './state.js'
 
+window.logout = async () => {
+
+    const confirmLogout =
+        confirm('Bạn muốn đăng xuất?')
+
+    if (!confirmLogout) return
+
+    await supabase.auth.signOut()
+
+    window.location.href = './auth.html'
+}
 export async function checkAuth() {
 
     try {
