@@ -1,5 +1,14 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
-// Sửa dòng này để đảm bảo luôn trỏ về đúng thư mục js ở gốc website
-import { env } from '/js/env.js'; 
+import { createClient }
+from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-export const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+const SUPABASE_URL =
+window.ENV.VITE_SUPABASE_URL
+
+const SUPABASE_ANON_KEY =
+window.ENV.VITE_SUPABASE_ANON_KEY
+
+export const supabase =
+createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+)
