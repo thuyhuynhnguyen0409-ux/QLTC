@@ -1,24 +1,19 @@
 {
   "version": 2,
-
+  "outputDirectory": "dist",
   "cleanUrls": true,
-
   "rewrites": [
-    {
-      "source": "/",
-      "destination": "/auth.html"
-    },
     {
       "source": "/auth",
       "destination": "/auth.html"
     },
     {
-      "source": "/index",
-      "destination": "/index.html"
-    },
-    {
       "source": "/stats",
       "destination": "/stats.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
