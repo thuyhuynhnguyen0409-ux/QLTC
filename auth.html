@@ -29,24 +29,27 @@
     </div>
 
 <script type="module">
-import { loginWithEmail } from '/js/auth.js'; // Sửa dấu chấm thành gạch chéo /
+    // Thêm dấu / ở đầu
+    import { loginWithEmail } from '/js/auth.js'; 
 
-document.getElementById('loginBtn').addEventListener('click', async () => {
-    const email = document.getElementById('email').value.trim();
-    if (!email) {
-        alert('Vui lòng nhập email');
-        return;
-    }
-    
-    const btn = document.getElementById('loginBtn');
-    btn.innerText = 'Đang gửi link...';
-    btn.disabled = true;
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+        const email = document.getElementById('email').value.trim();
+        if (!email) {
+            alert('Vui lòng nhập email');
+            return;
+        }
+        
+        const btn = document.getElementById('loginBtn');
+        btn.innerText = 'Đang gửi...';
+        btn.disabled = true;
 
-    await loginWithEmail(email);
-    
-    btn.innerText = 'Gửi link đăng nhập';
-    btn.disabled = false;
-});
+        try {
+            await loginWithEmail(email);
+        } finally {
+            btn.innerText = 'Gửi link đăng nhập';
+            btn.disabled = false;
+        }
+    });
 </script>
 </body>
 
