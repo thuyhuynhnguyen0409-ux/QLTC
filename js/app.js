@@ -1,20 +1,35 @@
 // js/app.js
-import { checkAuth, logout } from './auth.js';
-import { loadSettings } from './settings.js';
-import { loadTodayBudget } from './budget.js';
-import { updateHomeUI } from './ui.js';
-// Import thêm addExpense nếu bạn có file đó
-// import { addExpense } from './expenses.js'; 
-import {
-    checkAuth
-} from './auth.js'
-// Gán vào window để gọi được từ HTML
-window.logout = logout;
-window.toggleConfigModal = (show) => {
-    document.getElementById('configModal').classList.toggle('hidden', !show);
-};
 
-// Khởi tạo app
+import { checkAuth, logout } from './auth.js'
+
+window.logout = logout
+
+// TEST FUNCTION
+window.addExpense = () => {
+
+    alert('Add expense chạy OK')
+}
+
+window.suggestFood = () => {
+
+    alert('AI chạy OK')
+}
+
+window.toggleConfigModal = (show) => {
+
+    const modal =
+        document.getElementById(
+            'configModal'
+        )
+
+    if (!modal) return
+
+    modal.classList.toggle(
+        'hidden',
+        !show
+    )
+}
+
 async function init() {
 
     const user =
@@ -23,11 +38,20 @@ async function init() {
     if (!user) return
 
     console.log(
-        'LOGIN:',
+        'Đăng nhập:',
         user.email
     )
 
-    // load app
+    const userDisplay =
+        document.getElementById(
+            'userEmailDisplay'
+        )
+
+    if (userDisplay) {
+
+        userDisplay.innerText =
+            user.email
+    }
 }
 
-init();
+init()

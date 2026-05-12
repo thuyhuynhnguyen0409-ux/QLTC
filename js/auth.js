@@ -1,46 +1,91 @@
-// js/auth.js
-import { supabase } from './supabase.js'; // Vì cùng nằm trong thư mục js/
+import { supabase } from './supabase.js'
 
 export async function loginWithEmail(email) {
-    const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-            // Đảm bảo đường dẫn này khớp với URL Production của bạn
-            emailRedirectTo: window.location.origin + '/index.html'
-        }
-    });
+
+    const { error } =
+        await supabase.auth.signInWithOtp({
+
+            email,
+
+            options: {
+
+                emailRedirectTo:
+                    window.location.origin
+                    + '/index.html'
+            }
+        })
 
     if (error) {
-        alert('Lỗi: ' + error.message);
-        return;
+
+        console.error(error)
+
+        alert(
+            'Lỗi: ' + error.message
+        )
+
+        return false
     }
-    alert('Đã gửi link đăng nhập thành công! Hãy kiểm tra Email của bạn.');
+
+    alert(
+        'Đã gửi link đăng nhập.\nHãy kiểm tra email.'
+    )
+
+    return true
 }
 
 export async function logout() {
-    await supabase.auth.signOut();
-    window.location.href = './auth.html';
+
+    await supabase.auth.signOut()
+
+    localStorage.clear()
+
+    sessionStorage.clear()
+
+    window.location.replace(
+        './auth.html'
+    )
 }
 
 export async function checkAuth() {
 
-    // đợi Supabase restore session
+    try {
 
-    await new Promise(resolve =>
-        setTimeout(resolve, 1000)
-    )
+        // Đợi supabase restore session
+        await new Promise(resolve =>
+            setTimeout(resolve, 1500)
+        )
 
-    const {
-        data: { session },
-        error
-    } =
-        await supabase.auth.getSession()
+        const {
+            data: { session },
+            error
+        } =
+            await supabase.auth.getSession()
 
-    if (error) {
-        console.error(error)
-    }
+        if (error) {
 
-    if (!session?.user) {
+            console.error(error)
+
+            window.location.replace(
+                './auth.html'
+            )
+
+            return null
+        }
+
+        if (!session?.user) {
+
+            window.location.replace(
+                './auth.html'
+            )
+
+            return null
+        }
+
+        return session.user
+
+    } catch (err) {
+
+        console.error(err)
 
         window.location.replace(
             './auth.html'
@@ -48,6 +93,4 @@ export async function checkAuth() {
 
         return null
     }
-
-    return session.user
 }

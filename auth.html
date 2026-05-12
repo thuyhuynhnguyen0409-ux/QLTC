@@ -29,27 +29,51 @@
     </div>
 <script src="/env.js"></script>
 <script type="module">
-    // Thêm dấu / ở đầu
-    import { loginWithEmail } from '/js/auth.js'; 
 
-    document.getElementById('loginBtn').addEventListener('click', async () => {
-        const email = document.getElementById('email').value.trim();
-        if (!email) {
-            alert('Vui lòng nhập email');
-            return;
-        }
-        
-        const btn = document.getElementById('loginBtn');
-        btn.innerText = 'Đang gửi...';
-        btn.disabled = true;
+import {
+    loginWithEmail
+} from '/js/auth.js'
 
-        try {
-            await loginWithEmail(email);
-        } finally {
-            btn.innerText = 'Gửi link đăng nhập';
-            btn.disabled = false;
+document
+    .getElementById('loginBtn')
+    .addEventListener(
+        'click',
+        async () => {
+
+            const email =
+                document
+                    .getElementById('email')
+                    .value
+                    .trim()
+
+            if (!email) {
+
+                alert(
+                    'Nhập email'
+                )
+
+                return
+            }
+
+            const btn =
+                document.getElementById(
+                    'loginBtn'
+                )
+
+            btn.disabled = true
+
+            btn.innerText =
+                'Đang gửi...'
+
+            await loginWithEmail(email)
+
+            btn.disabled = false
+
+            btn.innerText =
+                'Gửi link đăng nhập'
         }
-    });
+    )
+
 </script>
 </body>
 

@@ -1,16 +1,27 @@
-import { createClient }
-from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+// js/supabase.js
 
-const env = window.ENV || {}
+import {
+    createClient
+} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
 const SUPABASE_URL =
-    env.VITE_SUPABASE_URL
+    window.ENV.VITE_SUPABASE_URL
 
-const SUPABASE_ANON_KEY =
-    env.VITE_SUPABASE_ANON_KEY
+const SUPABASE_KEY =
+    window.ENV.VITE_SUPABASE_ANON_KEY
 
 export const supabase =
     createClient(
         SUPABASE_URL,
-        SUPABASE_ANON_KEY
+        SUPABASE_KEY,
+        {
+            auth: {
+
+                persistSession: true,
+
+                autoRefreshToken: true,
+
+                detectSessionInUrl: true
+            }
+        }
     )
