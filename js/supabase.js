@@ -1,13 +1,10 @@
-import { createClient }
-from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-const SUPABASE_URL =
-'https://mojulicyvkrwoxbjpsem.supabase.co'
+// Lấy thông tin từ Environment Variables của Vercel
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-const SUPABASE_ANON_KEY ='sb_publishable_UPZNbtGZ7VnWzBtl7wyEmg_uyufvl-G'
-
-export const supabase =
-createClient(
+export const supabase = createClient(
     SUPABASE_URL,
     SUPABASE_ANON_KEY
 )
