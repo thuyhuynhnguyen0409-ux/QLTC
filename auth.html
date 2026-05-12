@@ -59,75 +59,32 @@ Finance AI
 
 <script type="module">
 
-import { supabase }
-from './js/supabase.js'
-
-async function checkLoggedIn() {
-
-    const {
-        data: { session }
-    } =
-        await supabase.auth.getSession()
-
-    if (session) {
-
-        window.location.replace('./index.html')
-    }
-}
-
-checkLoggedIn()
+import {
+    loginWithEmail
+} from './js/auth.js'
 
 document
-.getElementById('loginBtn')
-.onclick = async () => {
+    .getElementById('loginBtn')
+    .addEventListener(
+        'click',
+        async () => {
 
-    const email =
-        document.getElementById('email').value
+            const email =
+                document
+                    .getElementById('email')
+                    .value
+                    .trim()
 
-    const password =
-        document.getElementById('password').value
+            if (!email) {
 
-    const { error } =
-        await supabase.auth.signInWithPassword({
-            email,
-            password
-        })
+                alert('Nhập email')
+                return
+            }
 
-    if (error) {
+            await loginWithEmail(email)
+        }
+    )
 
-        alert(error.message)
-
-        return
-    }
-
-    window.location.replace('./index.html')
-}
-
-document
-.getElementById('registerBtn')
-.onclick = async () => {
-
-    const email =
-        document.getElementById('email').value
-
-    const password =
-        document.getElementById('password').value
-
-    const { error } =
-        await supabase.auth.signUp({
-            email,
-            password
-        })
-
-    if (error) {
-
-        alert(error.message)
-
-        return
-    }
-
-    alert('Đăng ký thành công')
-}
 </script>
 
 </body>

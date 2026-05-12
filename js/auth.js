@@ -1,64 +1,66 @@
-
 import { supabase } from './supabase.js'
 import { setUser } from './state.js'
 
-export async function logout() {
+window.logout = async () => {
 
-    const confirmLogout =
-        confirm('Bạn muốn đăng xuất?')
+    await supabase.auth.signOut()
 
-    if (!confirmLogout) return
+    localStorage.clear()
+    sessionStorage.clear()
+
+    window.location.replace('/auth.html')
+}
+
+export async function loginWithEmail(email) {
 
     const { error } =
-        await supabase.auth.signOut()
+        await supabase.auth.signInWithOtp({
+
+            email,
+
+            options: {
+
+                emailRedirectTo:
+                    'https://qltc-tawny.vercel.app'
+            }
+        })
 
     if (error) {
 
-        console.error(error)
-
-        alert('Logout thất bại')
-
-        return
+        alert(error.message)
+        return false
     }
 
-    localStorage.clear()
+    alert(
+        'Đã gửi link đăng nhập tới email'
+    )
 
-    sessionStorage.clear()
-
-    window.location.replace('./auth.html')
+    return true
 }
 
 export async function checkAuth() {
 
-    try {
+    const {
+        data: { session }
+    } =
+        await supabase.auth.getSession()
 
-        const {
-            data: { session }
-        } =
-            await supabase.auth.getSession()
+    if (!session?.user) {
 
-        if (!session?.user) {
+        if (
+            !window.location.pathname
+                .includes('auth.html')
+        ) {
 
-            if (
-                !window.location.pathname.includes('auth.html')
-            ) {
-
-                window.location.replace('./auth.html')
-            }
-
-            return null
+            window.location.replace(
+                '/auth.html'
+            )
         }
 
-        setUser(session.user)
-
-        return session.user
-
-    } catch (err) {
-
-        console.error(err)
-
-        window.location.replace('./auth.html')
-
-        return null
+        return false
     }
+
+    setUser(session.user)
+
+    return true
 }
