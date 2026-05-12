@@ -2,10 +2,7 @@
   "name": "qltc",
   "private": true,
   "scripts": {
-    "build": "node build-env.js",
+    "build": "node build-env.js && mkdir -p dist && cp -r js css *.html dist",
     "vercel-build": "npm run build"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.105.3"
   }
 }
