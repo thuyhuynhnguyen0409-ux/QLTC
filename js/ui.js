@@ -64,7 +64,7 @@ export function renderExpenseList() {
         <div class="text-right">
           <div class="font-black text-rose-500">${Number(exp.amount || 0).toLocaleString('vi-VN')}đ</div>
           <div class="flex gap-2 mt-3 justify-end">
-            <button class="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-500 text-white" onclick="editExpense('${exp.id}')">Sửa</button>
+            <button class="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-500 text-white" onclick='openEditExpense(${JSON.stringify(exp)})'">Sửa</button>
             <button class="px-3 py-1 rounded-xl text-xs font-bold bg-rose-500 text-white" onclick="deleteExpense('${exp.id}')">Xóa</button>
           </div>
         </div>

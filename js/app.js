@@ -6,7 +6,12 @@ import { updateHomeUI } from './ui.js';
 import { formatCurrencyInput } from './utils.js';
 import './day.js';
 import './ai.js';
-import './expenses.js';
+import {
+    addExpense,
+    openEditExpense,
+    submitEditExpense,
+    toggleEditExpenseModal
+} from './expenses.js'
 import './settings.js';
 import * as state from './state.js'
 window.formatCurrencyInput = formatCurrencyInput;

@@ -3,7 +3,7 @@ import * as state from './state.js';
 import { parseCurrency, getTodayString } from './utils.js';
 import { loadTodayBudget, syncTodayBudgetRow, recalcFutureBudgetsFromToday } from './budget.js';
 import { updateHomeUI } from './ui.js';
-
+let editingExpenseId = null
 function isTodayExpense(expense) {
   return expense?.expense_date === getTodayString();
 }
@@ -316,7 +316,7 @@ export async function renderExpenseList() {
           <div class="flex gap-2 mt-3 justify-end">
             <button
               class="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-500 text-white"
-              onclick="editExpense('${exp.id}')"
+              onclick='openEditExpense(${JSON.stringify(exp)})'
             >
               Sửa
             </button>
@@ -332,7 +332,14 @@ export async function renderExpenseList() {
     </div>
   `).join('');
 }
+window.openEditExpense =
+    openEditExpense
 
+window.submitEditExpense =
+    submitEditExpense
+
+window.toggleEditExpenseModal =
+    toggleEditExpenseModal
 window.addExpense = async function () {
   const name = document.getElementById('expName')?.value || '';
   const amount = document.getElementById('expAmount')?.value || '';
@@ -344,3 +351,105 @@ window.deleteExpense = deleteExpense;
 window.editExpense = editExpense;
 window.transferSavingsToBudget = transferSavingsToBudget;
 window.renderExpenseList = renderExpenseList;
+
+export function toggleEditExpenseModal(show) {
+
+  document
+    .getElementById('editExpenseModal')
+    .classList.toggle(
+      'hidden',
+      !show
+    )
+}
+
+export function openEditExpense(expense) {
+
+  editingExpenseId = expense.id
+
+  document
+    .getElementById('editExpenseName')
+    .value = expense.name
+
+  document
+    .getElementById('editExpenseAmount')
+    .value = expense.amount
+
+  document
+    .getElementById('editExpenseCategory')
+    .value = expense.category
+
+  toggleEditExpenseModal(true)
+}
+
+export async function submitEditExpense() {
+
+  const name =
+    document
+      .getElementById('editExpenseName')
+      .value
+
+  const amount =
+    Number(
+      document
+        .getElementById('editExpenseAmount')
+        .value
+    )
+
+  const category =
+    document
+      .getElementById('editExpenseCategory')
+      .value
+
+  const oldExpense =
+    state.expenses.find(
+      exp => exp.id === editingExpenseId
+    )
+
+  if (!oldExpense) return
+
+  const diff =
+    amount - Number(oldExpense.amount)
+
+  const {
+    error
+  } = await supabase
+    .from('expenses')
+    .update({
+      name,
+      amount,
+      category
+    })
+    .eq(
+      'id',
+      editingExpenseId
+    )
+
+  if (error) {
+
+    alert('Lỗi cập nhật')
+    return
+  }
+
+  state.currentCycle.remaining_money -= diff
+
+  await supabase
+    .from('monthly_cycles')
+    .update({
+      remaining_money:
+        state.currentCycle.remaining_money
+    })
+    .eq(
+      'id',
+      state.currentCycle.id
+    )
+
+  oldExpense.name = name
+  oldExpense.amount = amount
+  oldExpense.category = category
+
+  loadTodayBudget()
+
+  updateHomeUI()
+
+  toggleEditExpenseModal(false)
+}
