@@ -16,6 +16,13 @@ export function updateHomeUI() {
   setText('dailyBudget', formatMoney(daily));
   setText('todaySpentDisplay', formatMoney(spentToday));
   setText('remainingCycle', formatMoney(cycleRemaining));
+  setText(
+    'nextDailyBudget',
+    formatMoney(
+        state.todayBudget
+            ?.nextDailyBudget || 0
+    )
+);
   setText('currentSavingsDisplay', formatMoney(savings));
   setText('salaryDisplay', formatMoney(state.settings?.salary || 0));
   setText('fixedCostsDisplay', formatMoney(state.currentCycle?.total_fixed || 0));

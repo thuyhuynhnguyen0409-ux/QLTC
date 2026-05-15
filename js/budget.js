@@ -207,14 +207,45 @@ export async function loadTodayBudget() {
     row = inserted;
   }
 
-  const budget = {
+const daysLeft =
+    Math.max(
+        1,
+        daysBetweenInclusive(
+            today,
+            state.currentCycle.cycle_end
+        )
+    )
+
+const nextDailyBudget =
+    daysLeft > 1
+        ? (
+            state.currentCycle.remaining_money
+            / (daysLeft - 1)
+        )
+        : 0
+
+const budget = {
+
     ...row,
-    allocated: Number(row.allocated || 0),
-    spent: Number(row.spent || 0),
-    remaining: Number(row.remaining || 0),
-    saved_to_savings: Number(row.saved_to_savings || 0),
-    daysLeft: Math.max(1, daysBetweenInclusive(today, state.currentCycle.cycle_end))
-  };
+
+    allocated:
+        Number(row.allocated || 0),
+
+    spent:
+        Number(row.spent || 0),
+
+    remaining:
+        Number(row.remaining || 0),
+
+    saved_to_savings:
+        Number(row.saved_to_savings || 0),
+
+    daysLeft:
+        daysLeft,
+
+    nextDailyBudget:
+        nextDailyBudget
+};
 
   state.setTodayBudget(budget);
   return budget;
