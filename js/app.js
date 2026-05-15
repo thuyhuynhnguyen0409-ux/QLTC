@@ -8,7 +8,7 @@ import './day.js';
 import './ai.js';
 import './expenses.js';
 import './settings.js';
-
+import * as state from './state.js'
 window.formatCurrencyInput = formatCurrencyInput;
 
 window.toggleConfigModal = function (show) {
