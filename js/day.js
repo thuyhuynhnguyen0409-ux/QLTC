@@ -1,96 +1,74 @@
-import { supabase }
-from './supabase.js'
-
-import * as state
-from './state.js'
-
-import {
-    loadTodayBudget
-}
-from './budget.js'
+import { supabase } from './supabase.js';
+import * as state from './state.js';
+import { getTodayString } from './utils.js';
+import { loadTodayBudget, recalcFutureBudgetsFromToday, syncTodayBudgetRow } from './budget.js';
+import { updateHomeUI } from './ui.js';
 
 export async function closeDay() {
+  if (!state.user || !state.currentCycle) {
+    alert('Chưa có chu kỳ ngân sách');
+    return false;
+  }
 
-    if (
-        !state.todayBudget
-    ) return
+  if (!state.todayBudget) {
+    await loadTodayBudget();
+  }
 
-    const remain =
+  if (!state.todayBudget) return false;
 
-        Number(
-            state.todayBudget
-            .remaining
-        )
+  if (state.todayBudget.is_closed) {
+    alert('Ngày hôm nay đã được chốt');
+    return false;
+  }
 
-    // âm tiền -> không save
-    if (remain <= 0) {
+  const remain = Number(state.todayBudget.remaining || 0);
+  let addedToSavings = 0;
 
-        alert(
-            'Hôm nay không dư tiền'
-        )
+  if (remain > 0) {
+    addedToSavings = remain;
+  }
 
-        return
-    }
+  const newSavings = Number(state.currentSavings || 0) + addedToSavings;
+  const newRemainCycle = Number(state.currentCycle.remaining_money || 0) - addedToSavings;
 
-    // cộng savings
+  state.setCurrentSavings(newSavings);
+  state.currentCycle.remaining_money = newRemainCycle;
+  state.currentCycle.total_saved_extra = Number(state.currentCycle.total_saved_extra || 0) + addedToSavings;
 
-    const newSaving =
+  state.todayBudget.is_closed = true;
+  state.todayBudget.is_processed = true;
+  state.todayBudget.saved_to_savings = addedToSavings;
+  state.todayBudget.remaining = remain > 0 ? 0 : remain;
 
-        Number(
-            state.currentSavings
-        ) + remain
+  const { error: settingsError } = await supabase
+    .from('settings')
+    .update({ current_savings: newSavings })
+    .eq('user_id', state.user.id);
 
-    // trừ khỏi remaining cycle
+  if (settingsError) console.error(settingsError);
 
-    const newRemainCycle =
+  const { error: cycleError } = await supabase
+    .from('monthly_cycles')
+    .update({
+      remaining_money: newRemainCycle,
+      total_saved_extra: state.currentCycle.total_saved_extra
+    })
+    .eq('id', state.currentCycle.id);
 
-        Number(
-            state.currentCycle
-            .remaining_money
-        ) - remain
+  if (cycleError) console.error(cycleError);
 
-    await supabase
-        .from('settings')
-        .update({
+  await syncTodayBudgetRow();
+  await recalcFutureBudgetsFromToday();
+  await loadTodayBudget();
+  updateHomeUI();
 
-            current_savings:
-                newSaving
-        })
-        .eq(
-            'user_id',
-            state.user.id
-        )
+  if (addedToSavings > 0) {
+    alert(`Đã chuyển ${addedToSavings.toLocaleString('vi-VN')}đ vào hũ tiết kiệm`);
+  } else {
+    alert('Đã chốt ngày hôm nay');
+  }
 
-    await supabase
-        .from('monthly_cycles')
-        .update({
-
-            remaining_money:
-                newRemainCycle,
-
-            total_saved_extra:
-
-                Number(
-                    state.currentCycle
-                    .total_saved_extra
-                ) + remain
-        })
-        .eq(
-            'id',
-            state.currentCycle.id
-        )
-
-    state.setCurrentSavings(
-        newSaving
-    )
-
-    state.currentCycle
-        .remaining_money =
-        newRemainCycle
-
-    loadTodayBudget()
-
-    alert(
-        `Đã tiết kiệm ${remain.toLocaleString('vi-VN')}đ`
-    )
+  return true;
 }
+
+window.closeDay = closeDay;

@@ -1,118 +1,51 @@
-import {
-    checkAuth,
-    logout
-}
-from './auth.js'
+import { checkAuth } from './auth.js';
+import { loadSettings, fillSettingsForm } from './settings.js';
+import { ensureCurrentCycle, loadTodayBudget } from './budget.js';
+import { loadExpenses } from './expenses.js';
+import { updateHomeUI } from './ui.js';
+import { formatCurrencyInput } from './utils.js';
+import './day.js';
+import './ai.js';
+import './expenses.js';
+import './settings.js';
 
-import {
-    loadSettings
-}
-from './settings.js'
+window.formatCurrencyInput = formatCurrencyInput;
 
-import {
-    loadTodayBudget
-}
-from './budget.js'
+window.toggleConfigModal = function (show) {
+  const modal = document.getElementById('configModal');
+  if (!modal) return;
 
-import {
-    updateHomeUI
-}
-from './ui.js'
+  if (show) {
+    fillSettingsForm();
+  }
 
-import {
-    addExpense,
-    transferSavingsToBudget
-}
-from './expenses.js'
-
-import {
-    suggestFood
-}
-from './ai.js'
-
-import {
-    closeDay
-}
-from './day.js'
-
-import * as state
-from './state.js'
-
-// GLOBAL FUNCTIONS
-
-window.logout = logout
-
-window.suggestFood =
-suggestFood
-
-window.closeDay =
-closeDay
-
-window.transferSavingsToBudget =
-transferSavingsToBudget
-
-window.toggleConfigModal =
-(show) => {
-
-    document
-    .getElementById(
-        'configModal'
-    )
-    .classList.toggle(
-        'hidden',
-        !show
-    )
-}
-
-window.addExpense =
-async () => {
-
-    const name =
-
-        document
-        .getElementById(
-            'expName'
-        )
-        .value
-
-    const amount =
-
-        document
-        .getElementById(
-            'expAmount'
-        )
-        .value
-
-    const category =
-
-        document
-        .getElementById(
-            'expCategory'
-        )
-        .value
-
-    await addExpense(
-        name,
-        amount,
-        category
-    )
-}
+  modal.classList.toggle('hidden', !show);
+};
 
 async function init() {
+  const user = await checkAuth();
+  if (!user) return;
 
-    const user =
-        await checkAuth()
+  await loadSettings();
 
-    if (!user)
-        return
+  const setupPrompt = document.getElementById('setupPrompt');
+  const dashboard = document.getElementById('dashboard');
 
-    state.setUser(user)
+  if (!Number(state.settings?.salary || 0)) {
+    if (setupPrompt) setupPrompt.classList.remove('hidden');
+    if (dashboard) dashboard.classList.add('hidden');
+    return;
+  }
 
-    await loadSettings()
+  if (setupPrompt) setupPrompt.classList.add('hidden');
+  if (dashboard) dashboard.classList.remove('hidden');
 
-    loadTodayBudget()
-
-    updateHomeUI()
+  await ensureCurrentCycle();
+  await loadExpenses();
+  await loadTodayBudget();
+  updateHomeUI();
 }
 
-init()
+window.__refreshApp = init;
+
+init();

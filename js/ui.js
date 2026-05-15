@@ -1,60 +1,74 @@
-import * as state
-from './state.js'
+import * as state from './state.js';
+import { formatMoney, getTodayString } from './utils.js';
+import { renderHomeChart } from './charts.js';
 
-import {
-    formatMoney
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = value;
 }
-from './utils.js'
-
-import {
-    renderChart
-}
-from './charts.js'
 
 export function updateHomeUI() {
+  const daily = Number(state.todayBudget?.remaining || 0);
+  const spentToday = Number(state.todayBudget?.spent || 0);
+  const cycleRemaining = Number(state.currentCycle?.remaining_money || 0);
+  const savings = Number(state.currentSavings || 0);
 
-    if (!state.todayBudget)
-        return
+  setText('dailyBudget', formatMoney(daily));
+  setText('todaySpentDisplay', formatMoney(spentToday));
+  setText('remainingCycle', formatMoney(cycleRemaining));
+  setText('currentSavingsDisplay', formatMoney(savings));
+  setText('salaryDisplay', formatMoney(state.settings?.salary || 0));
+  setText('fixedCostsDisplay', formatMoney(state.currentCycle?.total_fixed || 0));
 
-    document
-        .getElementById(
-            'dailyBudget'
-        )
-        .innerText =
-        formatMoney(
-            state.todayBudget.remaining
-        )
+  const dailyEl = document.getElementById('dailyBudget');
+  if (dailyEl) {
+    dailyEl.classList.toggle('text-rose-500', daily < 0);
+    dailyEl.classList.toggle('text-indigo-600', daily >= 0);
+  }
 
-    document
-        .getElementById(
-            'remainingCycle'
-        )
-        .innerText =
-        formatMoney(
-            state.currentCycle
-            .remaining_money
-        )
+  renderExpenseList();
 
-    document
-        .getElementById(
-            'currentSavings'
-        )
-        .innerText =
-        formatMoney(
-            state.currentSavings
-        )
+  renderHomeChart(
+    state.currentCycle?.total_fixed || 0,
+    state.currentCycle?.total_spent || 0,
+    cycleRemaining,
+    savings
+  );
+}
 
-    renderChart(
+export function renderExpenseList() {
+  const wrap = document.getElementById('expenseList');
+  if (!wrap) return;
 
-        state.currentCycle
-        .total_fixed,
+  const today = getTodayString();
+  const list = (state.expenses || [])
+    .filter(e => e.expense_date === today && !e.deleted_at)
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
 
-        state.currentCycle
-        .total_spent,
+  if (!list.length) {
+    wrap.innerHTML = `
+      <div class="text-center py-12 text-slate-400">
+        Chưa có chi tiêu hôm nay
+      </div>
+    `;
+    return;
+  }
 
-        state.currentCycle
-        .remaining_money,
-
-        state.currentSavings
-    )
+  wrap.innerHTML = list.map(exp => `
+    <div class="expense-row bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-3">
+      <div class="flex justify-between gap-3">
+        <div>
+          <div class="font-bold text-slate-900">${exp.name}</div>
+          <div class="text-[10px] uppercase tracking-widest text-slate-400 mt-1">${exp.category || 'other'}</div>
+        </div>
+        <div class="text-right">
+          <div class="font-black text-rose-500">${Number(exp.amount || 0).toLocaleString('vi-VN')}đ</div>
+          <div class="flex gap-2 mt-3 justify-end">
+            <button class="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-500 text-white" onclick="editExpense('${exp.id}')">Sửa</button>
+            <button class="px-3 py-1 rounded-xl text-xs font-bold bg-rose-500 text-white" onclick="deleteExpense('${exp.id}')">Xóa</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
 }

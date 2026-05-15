@@ -1,55 +1,70 @@
-/* css/style.css */
-input:focus, select:focus, textarea:focus {
-    border-color: #6366f1; /* Indigo-500 */
-    outline: none;
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+* {
+  box-sizing: border-box;
 }
 
-.modal-active {
-    overflow: hidden;
+html {
+  scroll-behavior: smooth;
 }
 
-/* Hiệu ứng cho các dòng chi tiêu */
-#expenseList > div {
-    transition: all 0.2s;
-}
-#expenseList > div:active {
-    transform: scale(0.98);
-}
-body{
-    font-family:
-    Inter,
-    sans-serif;
+body {
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
+canvas {
+  max-width: 100%;
+}
+
+button,
 input,
-textarea,
-select{
-    font-size:16px;
+select,
+textarea {
+  font: inherit;
 }
 
-::-webkit-scrollbar{
-    width:6px;
+button {
+  transition: transform .15s ease, opacity .15s ease, background-color .15s ease;
 }
 
-::-webkit-scrollbar-thumb{
-    background:#cbd5e1;
-    border-radius:999px;
+button:active {
+  transform: scale(.98);
 }
 
-.fixed-cost-row{
-    animation:fade .2s ease;
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-@keyframes fade{
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
 
-    from{
-        opacity:0;
-        transform:translateY(10px);
-    }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-    to{
-        opacity:1;
-        transform:none;
-    }
+.card-soft {
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
+}
+
+.modal-panel {
+  box-shadow: 0 20px 60px rgba(15, 23, 42, .18);
+}
+
+.expense-row,
+.fixed-cost-row {
+  animation: fadeUp .2s ease;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

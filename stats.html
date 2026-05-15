@@ -1,236 +1,80 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Thống kê - Finance AI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="./css/style.css"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thống kê - Finance AI</title>
+
+  <link rel="icon" href="data:," />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/css/style.css" />
 </head>
 
-<body class="bg-slate-100 min-h-screen">
-    <canvas
-    id="statsChart"
-    class="mt-5"
-></canvas>
-<div class="max-w-md mx-auto p-4">
-    <div class="flex justify-between items-center mb-5">
+<body class="bg-slate-50 text-slate-900">
+  <script src="/env.js"></script>
+
+  <div id="statsPage" class="max-w-6xl mx-auto p-4 md:p-8">
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-black">Thống kê chi tiêu</h1>
+        <p class="text-slate-500 text-sm mt-1">Lịch sử theo tháng, năm và danh mục</p>
+      </div>
+
+      <div class="flex gap-3">
+        <a href="/index.html" class="px-5 py-3 rounded-2xl bg-white border border-slate-200 font-bold">Trang chủ</a>
+        <button onclick="logout()" class="px-5 py-3 rounded-2xl bg-rose-500 text-white font-bold">Đăng xuất</button>
+      </div>
+    </header>
+
+    <section class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-slate-50 rounded-2xl p-4">
+          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-black">Tổng chi</p>
+          <h2 id="statsTotal" class="text-2xl font-black mt-1">0đ</h2>
+        </div>
+        <div class="bg-slate-50 rounded-2xl p-4">
+          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-black">Số giao dịch</p>
+          <h2 id="statsCount" class="text-2xl font-black mt-1">0</h2>
+        </div>
+        <div class="bg-slate-50 rounded-2xl p-4">
+          <p class="text-[10px] uppercase tracking-widest text-slate-400 font-black">Trung bình/giao dịch</p>
+          <h2 id="statsAverage" class="text-2xl font-black mt-1">0đ</h2>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-            <h1 class="text-3xl font-black">Thống kê</h1>
-            <p class="text-slate-500 text-sm">Lịch sử chi tiêu</p>
+          <label class="text-sm font-bold text-slate-600">Năm</label>
+          <select id="yearFilter" class="w-full mt-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none"></select>
         </div>
-        <a href="./index.html" class="bg-indigo-500 text-white px-4 py-2 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-200">
-            Trang chủ
-        </a>
-    </div>
-
-    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
-        <div class="grid grid-cols-2 gap-4 text-center">
-            <div class="border-r border-slate-100">
-                <p class="text-slate-500 text-xs uppercase font-bold">Tổng chi tiêu</p>
-                <h2 id="totalSpent" class="text-xl font-black text-rose-500 mt-1">0đ</h2>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs uppercase font-bold">Giao dịch</p>
-                <h2 id="totalExpenses" class="text-xl font-black text-slate-800 mt-1">0</h2>
-            </div>
+        <div>
+          <label class="text-sm font-bold text-slate-600">Tháng</label>
+          <select id="monthFilter" class="w-full mt-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none"></select>
         </div>
-    </div>
+      </div>
+    </section>
 
-    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5 border border-slate-100">
-        <div class="grid grid-cols-2 gap-3">
-            <select id="monthFilter" class="p-3 border rounded-2xl bg-slate-50 outline-none text-sm">
-                <option value="">Tất cả tháng</option>
-            </select>
-            <select id="yearFilter" class="p-3 border rounded-2xl bg-slate-50 outline-none text-sm">
-                <option value="">Tất cả năm</option>
-            </select>
-        </div>
-        <button id="applyFilterBtn" class="w-full bg-slate-900 text-white p-3 rounded-2xl mt-4 font-bold active:scale-95 transition">
-            Lọc thống kê
-        </button>
-    </div>
+    <section class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100">
+        <h3 class="font-black text-xl mb-4">Chi tiêu theo tháng</h3>
+        <canvas id="monthlyChart"></canvas>
+      </div>
 
-    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
-        <h3 class="font-bold text-lg mb-4">Cơ cấu chi tiêu</h3>
-        <canvas id="statsChart" style="max-height: 250px;"></canvas>
-    </div>
+      <div class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100">
+        <h3 class="font-black text-xl mb-4">Theo danh mục</h3>
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </section>
 
-    <div class="bg-white p-5 rounded-3xl shadow-sm mb-5">
-        <h3 class="font-bold text-lg mb-4">Theo danh mục</h3>
-        <div id="categoryStats" class="space-y-4"></div>
-    </div>
+    <section class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100">
+      <h3 class="font-black text-xl mb-5">Lịch sử giao dịch</h3>
+      <div id="historyList"></div>
+    </section>
+  </div>
 
-    <div class="bg-white p-5 rounded-3xl shadow-sm">
-        <h3 class="font-bold text-lg mb-4">Chi tiết giao dịch</h3>
-        <div id="historyList" class="divide-y divide-slate-50"></div>
-    </div>
-</div>
-<script src="/env.js"></script>
-<script type="module">
-import { supabase } from './js/supabase.js'
-import { formatMoney } from './js/utils.js'
-
-let user = null
-let expenses = []
-
-const categories = {
-    food: 'Ăn uống',
-    transport: 'Di chuyển',
-    shopping: 'Mua sắm',
-    bills: 'Hóa đơn',
-    other: 'Khác'
-}
-
-const catColors = {
-    food: '#fbbf24',
-    transport: '#3b82f6',
-    shopping: '#ec4899',
-    bills: '#ef4444',
-    other: '#94a3b8'
-}
-
-async function init() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-        window.location.href = './auth.html'
-        return
-    }
-    user = session.user
-    await loadExpenses()
-    renderFilters()
-    renderStats(expenses)
-
-    document.getElementById('applyFilterBtn').addEventListener('click', applyFilters)
-}
-
-async function loadExpenses() {
-    const { data } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-        .order('expense_date', { ascending: false })
-
-    expenses = data || []
-}
-
-function renderFilters() {
-    const monthSelect = document.getElementById('monthFilter')
-    const yearSelect = document.getElementById('yearFilter')
-
-    for (let i = 1; i <= 12; i++) {
-        monthSelect.innerHTML += `<option value="${i}">Tháng ${i}</option>`
-    }
-
-    const years = [...new Set(expenses.map(e => new Date(e.expense_date).getFullYear()))].sort((a,b) => b-a)
-    years.forEach(y => {
-        yearSelect.innerHTML += `<option value="${y}">${y}</option>`
-    })
-}
-
-function applyFilters() {
-    const month = document.getElementById('monthFilter').value
-    const year = document.getElementById('yearFilter').value
-
-    let filtered = expenses.filter(e => {
-        const d = new Date(e.expense_date);
-        const mMatch = month ? (d.getMonth() + 1) == month : true;
-        const yMatch = year ? d.getFullYear() == year : true;
-        return mMatch && yMatch;
-    });
-
-    renderStats(filtered)
-}
-
-function renderStats(list) {
-    const total = list.reduce((sum, e) => sum + Number(e.amount), 0)
-    document.getElementById('totalSpent').innerText = formatMoney(total)
-    document.getElementById('totalExpenses').innerText = list.length
-
-    renderHistory(list)
-    renderCategoryStats(list, total)
-    renderChart(list)
-}
-
-function renderHistory(list) {
-    const container = document.getElementById('historyList')
-    if (!list.length) {
-        container.innerHTML = `<div class="text-center text-slate-400 py-10">Không có dữ liệu</div>`
-        return
-    }
-
-    container.innerHTML = list.map(exp => `
-        <div class="py-4">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="font-bold text-slate-800">${exp.name}</p>
-                    <p class="text-xs text-slate-500 uppercase font-medium">${categories[exp.category] || 'Khác'}</p>
-                </div>
-                <b class="text-rose-500">-${formatMoney(exp.amount)}</b>
-            </div>
-            <p class="text-[10px] text-slate-400 mt-1">${new Date(exp.expense_date).toLocaleDateString('vi-VN')}</p>
-        </div>
-    `).join('')
-}
-
-function renderCategoryStats(list, total) {
-    const grouped = {}
-    list.forEach(exp => {
-        grouped[exp.category] = (grouped[exp.category] || 0) + Number(exp.amount)
-    })
-
-    const container = document.getElementById('categoryStats')
-    container.innerHTML = Object.entries(grouped)
-        .sort((a, b) => b[1] - a[1])
-        .map(([key, value]) => {
-            const percent = total > 0 ? Math.round((value / total) * 100) : 0
-            return `
-                <div>
-                    <div class="flex justify-between mb-1 text-sm">
-                        <span class="font-medium text-slate-600">${categories[key] || 'Khác'}</span>
-                        <span class="font-bold">${formatMoney(value)} (${percent}%)</span>
-                    </div>
-                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div class="h-full rounded-full" style="width: ${percent}%; background-color: ${catColors[key] || '#94a3b8'}"></div>
-                    </div>
-                </div>
-            `
-        }).join('')
-}
-
-function renderChart(list) {
-    const grouped = {}
-    list.forEach(exp => {
-        grouped[exp.category] = (grouped[exp.category] || 0) + Number(exp.amount)
-    })
-
-    const ctx = document.getElementById('statsChart')
-    if (window.statsChartInstance) window.statsChartInstance.destroy()
-
-    window.statsChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(grouped).map(k => categories[k] || 'Khác'),
-            datasets: [{
-                data: Object.values(grouped),
-                backgroundColor: Object.keys(grouped).map(k => catColors[k] || '#94a3b8'),
-                borderWidth: 0,
-                hoverOffset: 20
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
-            },
-            cutout: '65%'
-        }
-    })
-}
-
-init()
-</script>
+  <script type="module" src="/js/stats.js"></script>
 </body>
 </html>

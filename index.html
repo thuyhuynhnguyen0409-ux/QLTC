@@ -1,399 +1,192 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance AI</title>
 
-<meta charset="UTF-8" />
-
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-/>
-
-<title>
-Finance AI
-</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<link
-    rel="stylesheet"
-    href="./css/style.css"
-/>
-
+  <link rel="icon" href="data:," />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/css/style.css" />
 </head>
 
-<body class="bg-slate-100 min-h-screen">
-
-<div class="max-w-md mx-auto p-4">
-
-    <!-- HEADER -->
-
-    <div class="flex justify-between items-center mb-5">
-
-        <div>
-
-            <h1 class="text-3xl font-black">
-                Finance AI
-            </h1>
-
-            <p
-                id="userEmailDisplay"
-                class="text-sm text-slate-500"
-            ></p>
-
-        </div>
-
-        <button
-            onclick="logout()"
-            class="bg-red-500 text-white px-4 py-2 rounded-2xl"
-        >
-            Logout
-        </button>
-<button
-    onclick="transferSavingsToBudget()"
-    class="w-full bg-amber-500 text-white p-4 rounded-2xl mt-3"
->
-    Chuyển tiết kiệm sang chi tiêu
-</button>
-
-<button
-    onclick="closeDay()"
-    class="w-full bg-emerald-500 text-white p-4 rounded-2xl mt-3"
->
-    Kết thúc ngày
-</button>
-    </div>
-
-    <!-- DAILY -->
-
-    <div class="bg-white p-5 rounded-3xl shadow-sm">
-
-        <p class="text-slate-500">
-            Chi tiêu hôm nay
-        </p>
-
-        <h2
-            id="dailyBudget"
-            class="text-4xl font-black mt-2"
-        >
-            0đ
-        </h2>
-
-        <div class="mt-4">
-
-            <div class="flex justify-between text-sm">
-
-                <span class="text-slate-500">
-                    Còn lại chu kỳ
-                </span>
-
-                <b id="remainingCycle">
-                    0đ
-                </b>
-
-            </div>
-
-            <div class="flex justify-between text-sm mt-2">
-
-                <span class="text-slate-500">
-                    Tiết kiệm hiện tại
-                </span>
-
-                <b id="currentSavings">
-                    0đ
-                </b>
-
-            </div>
-
-        </div>
-
-    </div>
-
-    <!-- CHART -->
-
-    <div class="bg-white p-5 rounded-3xl mt-5 shadow-sm">
-
-        <canvas id="mainChart"></canvas>
-
-    </div>
-
-    <!-- ADD EXPENSE -->
-
-    <div class="bg-white p-5 rounded-3xl mt-5 shadow-sm">
-
-        <h3 class="font-bold text-lg mb-4">
-            Thêm chi tiêu
-        </h3>
-
-        <input
-            id="expName"
-            class="w-full p-3 border rounded-xl mb-3"
-            placeholder="Tên khoản chi"
-        />
-
-        <input
-            id="expAmount"
-            class="w-full p-3 border rounded-xl mb-3"
-            placeholder="Số tiền"
-        />
-
-        <select
-            id="expCategory"
-            class="w-full p-3 border rounded-xl mb-3"
-        >
-
-            <option value="food">
-                Ăn uống
-            </option>
-
-            <option value="transport">
-                Di chuyển
-            </option>
-
-            <option value="shopping">
-                Mua sắm
-            </option>
-
-            <option value="bills">
-                Hóa đơn
-            </option>
-
-            <option value="other">
-                Khác
-            </option>
-
-        </select>
-
-        <button
-            onclick="addExpense()"
-            class="w-full bg-indigo-500 text-white p-4 rounded-2xl font-bold"
-        >
-            Thêm chi tiêu
-        </button>
-
-    </div>
-
-    <!-- EXPENSE LIST -->
-
-    <div class="bg-white p-5 rounded-3xl mt-5 shadow-sm">
-
-        <div class="flex justify-between items-center mb-4">
-
-            <h3 class="font-bold text-lg">
-                Lịch sử chi tiêu
-            </h3>
-
-            <a
-                href="./stats.html"
-                class="text-indigo-500 text-sm font-bold"
-            >
-                Xem thống kê
-            </a>
-
-        </div>
-
-        <div id="expenseList"></div>
-
-    </div>
-
-    <!-- AI -->
-
-    <div class="bg-white p-5 rounded-3xl mt-5 shadow-sm">
-
-        <h3 class="font-bold text-lg mb-3">
-            AI gợi ý món ăn
-        </h3>
-
-        <textarea
-            id="chefNote"
-            class="w-full p-3 border rounded-2xl mb-3"
-            placeholder="VD: ít dầu mỡ, nhiều protein..."
-        ></textarea>
-
-        <button
-            id="btnSuggest"
-            onclick="suggestFood()"
-            class="w-full bg-emerald-500 text-white p-4 rounded-2xl font-bold"
-        >
-            Gợi ý món ăn
-        </button>
-
-        <div
-            id="aiChefText"
-            class="mt-4 text-sm whitespace-pre-wrap"
-        ></div>
-
-    </div>
-
-    <!-- SETTINGS -->
-
-    <div class="mt-5">
-
-        <button
-            onclick="toggleConfigModal(true)"
-            class="w-full bg-slate-900 text-white p-4 rounded-2xl font-bold"
-        >
-            Cài đặt tài chính
-        </button>
-
-    </div>
-
-</div>
-
-
-<!-- CONFIG MODAL -->
-
-<div
-    id="configModal"
-    class="hidden fixed inset-0 bg-black/50 z-50 overflow-y-auto"
->
-
-<div class="min-h-screen flex items-end md:items-center justify-center p-3">
-
-<div class="bg-white w-full max-w-lg rounded-t-[35px] md:rounded-[35px] p-5">
-
-    <!-- HEADER -->
-
-    <div class="flex justify-between items-center mb-6">
-
-        <div>
-
-            <h2 class="text-3xl font-black">
-                Thiết lập tài chính
-            </h2>
-
-            <p class="text-slate-500 text-sm mt-1">
-                Cấu hình chu kỳ chi tiêu
-            </p>
-
-        </div>
-
-        <button
-            onclick="toggleConfigModal(false)"
-            class="w-10 h-10 rounded-full bg-slate-100 text-xl"
-        >
-            ×
-        </button>
-
-    </div>
-
-    <!-- FORM -->
-
-    <div class="space-y-4">
-
-        <div>
-
-            <label class="text-sm font-bold text-slate-600">
-                Thu nhập tháng
-            </label>
-
-            <input
-                id="salaryInput"
-                class="w-full mt-2 p-4 bg-slate-100 rounded-2xl outline-none"
-                placeholder="10.000.000"
-            />
-
-        </div>
-
-        <div>
-
-            <label class="text-sm font-bold text-slate-600">
-                Tiết kiệm ban đầu
-            </label>
-
-            <input
-                id="savingsInput"
-                class="w-full mt-2 p-4 bg-slate-100 rounded-2xl outline-none"
-                placeholder="2.000.000"
-            />
-
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-
+<body class="bg-slate-50 text-slate-900">
+  <script src="/env.js"></script>
+
+  <div class="max-w-6xl mx-auto p-4 md:p-8">
+    <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-black">Finance <span class="text-indigo-600">AI</span></h1>
+        <p id="userEmailDisplay" class="text-sm text-slate-500 mt-1"></p>
+      </div>
+
+      <div class="flex gap-3">
+        <a href="/stats.html" class="px-5 py-3 rounded-2xl bg-white border border-slate-200 font-bold">Thống kê</a>
+        <button onclick="toggleConfigModal(true)" class="px-5 py-3 rounded-2xl bg-white border border-slate-200 font-bold">Cài đặt</button>
+        <button onclick="logout()" class="px-5 py-3 rounded-2xl bg-rose-500 text-white font-bold">Đăng xuất</button>
+      </div>
+    </header>
+
+    <section id="setupPrompt" class="hidden bg-white rounded-[2rem] md:rounded-[3rem] p-8 md:p-10 shadow-sm border border-slate-100 text-center">
+      <div class="text-6xl mb-4">🏦</div>
+      <h2 class="text-2xl font-black mb-2">Thiết lập ngân sách</h2>
+      <p class="text-slate-500 mb-8">Nhập thu nhập, ngày nhận lương, ngày tổng kết và các chi phí cố định.</p>
+      <button onclick="toggleConfigModal(true)" class="px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black">Thiết lập ngay</button>
+    </section>
+
+    <div id="dashboard" class="hidden grid grid-cols-1 xl:grid-cols-12 gap-6">
+      <div class="xl:col-span-8 space-y-6">
+        <section class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100 card-soft">
+          <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-6">
             <div>
-
-                <label class="text-sm font-bold text-slate-600">
-                    Ngày nhận lương
-                </label>
-
-                <input
-                    id="paydayInput"
-                    type="number"
-                    class="w-full mt-2 p-4 bg-slate-100 rounded-2xl outline-none"
-                    placeholder="1"
-                />
-
+              <p class="text-[11px] uppercase tracking-widest font-black text-slate-400 mb-2">Mức chi tiêu hôm nay</p>
+              <h2 id="dailyBudget" class="text-5xl font-black text-indigo-600">0đ</h2>
+              <p class="text-slate-400 mt-3 text-sm">Số tiền còn lại trong ngày</p>
             </div>
 
-            <div>
+            <div class="w-52 h-52 mx-auto md:mx-0">
+              <canvas id="mainChart"></canvas>
+            </div>
+          </div>
 
-                <label class="text-sm font-bold text-slate-600">
-                    Ngày kết thúc
-                </label>
-
-                <input
-                    id="cycleEndInput"
-                    type="number"
-                    class="w-full mt-2 p-4 bg-slate-100 rounded-2xl outline-none"
-                    placeholder="30"
-                />
-
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+            <div class="bg-slate-50 rounded-2xl p-4">
+              <p class="text-[10px] uppercase font-black text-slate-400">Thu nhập</p>
+              <h3 id="salaryDisplay" class="font-black mt-1">0đ</h3>
             </div>
 
-        </div>
-
-        <!-- FIXED COSTS -->
-
-        <div class="pt-2">
-
-            <div class="flex justify-between items-center mb-3">
-
-                <h3 class="font-black text-lg">
-                    Chi phí cố định
-                </h3>
-
-                <button
-                    onclick="addFixedCostRow()"
-                    class="bg-indigo-500 text-white px-4 py-2 rounded-2xl text-sm font-bold"
-                >
-                    + Thêm
-                </button>
-
+            <div class="bg-slate-50 rounded-2xl p-4">
+              <p class="text-[10px] uppercase font-black text-slate-400">Phí cố định</p>
+              <h3 id="fixedCostsDisplay" class="font-black mt-1">0đ</h3>
             </div>
 
-            <div
-                id="fixedCostsList"
-                class="space-y-3"
-            ></div>
+            <div class="bg-slate-50 rounded-2xl p-4">
+              <p class="text-[10px] uppercase font-black text-slate-400">Đã chi hôm nay</p>
+              <h3 id="todaySpentDisplay" class="font-black mt-1 text-rose-500">0đ</h3>
+            </div>
 
-        </div>
+            <div class="bg-slate-50 rounded-2xl p-4">
+              <p class="text-[10px] uppercase font-black text-slate-400">Hũ tiết kiệm</p>
+              <h3 id="currentSavingsDisplay" class="font-black mt-1 text-emerald-600">0đ</h3>
+            </div>
+          </div>
 
-        <!-- SAVE -->
+          <div class="mt-6 flex flex-col md:flex-row gap-3">
+            <button onclick="transferSavingsToBudget()" class="flex-1 px-5 py-4 rounded-2xl bg-amber-500 text-white font-black">Chuyển tiết kiệm sang chi tiêu</button>
+            <button onclick="closeDay()" class="flex-1 px-5 py-4 rounded-2xl bg-emerald-500 text-white font-black">Kết thúc ngày</button>
+          </div>
 
-        <button
-            onclick="initBudget()"
-            class="w-full bg-slate-900 text-white p-4 rounded-2xl font-black text-lg mt-4"
-        >
-            Lưu thiết lập
-        </button>
+          <div class="mt-6 bg-slate-50 rounded-2xl p-4 flex justify-between items-center">
+            <span class="text-sm text-slate-500">Còn lại chu kỳ</span>
+            <b id="remainingCycle" class="text-lg font-black">0đ</b>
+          </div>
+        </section>
 
+        <section class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100">
+          <h3 class="font-black text-xl mb-5">Thêm chi tiêu</h3>
+          <div class="space-y-4">
+            <input id="expName" type="text" class="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none" placeholder="Tên khoản chi" />
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input id="expAmount" type="text" oninput="formatCurrencyInput(this)" class="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none" placeholder="Số tiền" />
+              <select id="expCategory" class="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none">
+                <option value="food">Ăn uống</option>
+                <option value="transport">Di chuyển</option>
+                <option value="shopping">Mua sắm</option>
+                <option value="bills">Hóa đơn</option>
+                <option value="other">Khác</option>
+              </select>
+            </div>
+            <button onclick="addExpense()" class="w-full p-4 rounded-2xl bg-indigo-600 text-white font-black">Lưu chi tiêu</button>
+          </div>
+        </section>
+
+        <section class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100">
+          <div class="flex items-center justify-between gap-4 mb-5">
+            <h3 class="font-black text-xl">Lịch sử chi tiêu hôm nay</h3>
+            <a href="/stats.html" class="text-sm font-bold text-indigo-600">Xem thống kê</a>
+          </div>
+          <div id="expenseList"></div>
+        </section>
+      </div>
+
+      <div class="xl:col-span-4 space-y-6">
+        <section class="bg-emerald-600 text-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-xl">
+          <div class="flex justify-between items-center mb-5">
+            <h3 class="font-black text-xl">AI gợi ý món ăn</h3>
+            <span class="text-[10px] uppercase font-black bg-white/20 px-3 py-1 rounded-full">Gemini</span>
+          </div>
+
+          <div class="bg-white rounded-3xl p-5 text-slate-700 min-h-[160px] flex items-center justify-center text-center font-bold">
+            <p id="aiChefText">Nhập ghi chú và bấm gợi ý để AI đề xuất món ăn.</p>
+          </div>
+
+          <textarea id="chefNote" class="w-full mt-5 p-4 rounded-2xl bg-emerald-700/30 border border-white/10 outline-none placeholder:text-white/60" placeholder="Ví dụ: ít dầu mỡ, có món canh..."></textarea>
+
+          <button id="btnSuggest" onclick="suggestFood()" class="w-full mt-5 bg-white text-emerald-700 py-4 rounded-2xl font-black">🍚 Gợi ý món ăn</button>
+        </section>
+
+        <section class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100">
+          <h3 class="font-black text-xl mb-5">Tổng kết nhanh</h3>
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between"><span class="text-slate-500">Thu nhập</span><b id="summarySalary">0đ</b></div>
+            <div class="flex justify-between"><span class="text-slate-500">Phí cố định</span><b id="summaryFixed">0đ</b></div>
+            <div class="flex justify-between"><span class="text-slate-500">Đã chi hôm nay</span><b id="summarySpent">0đ</b></div>
+            <div class="flex justify-between"><span class="text-slate-500">Tiết kiệm hiện tại</span><b id="summarySavings">0đ</b></div>
+          </div>
+        </section>
+      </div>
     </div>
+  </div>
 
-</div>
+  <div id="configModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto">
+    <div class="min-h-screen flex items-end md:items-center justify-center p-3 md:p-6">
+      <div class="bg-white w-full max-w-2xl rounded-t-[2rem] md:rounded-[2.5rem] p-6 md:p-8 modal-panel">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h2 class="text-2xl md:text-3xl font-black">Thiết lập tài chính</h2>
+            <p class="text-slate-500 text-sm mt-1">Thu nhập, ngày nhận lương, ngày tổng kết và chi phí cố định</p>
+          </div>
+          <button onclick="toggleConfigModal(false)" class="w-11 h-11 rounded-full bg-slate-100 text-2xl">×</button>
+        </div>
 
-</div>
+        <div class="space-y-4">
+          <div>
+            <label class="text-sm font-bold text-slate-600">Tổng thu nhập tháng</label>
+            <input id="salaryInput" type="text" oninput="formatCurrencyInput(this)" class="w-full mt-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none" placeholder="10.000.000" />
+          </div>
 
-</div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-sm font-bold text-slate-600">Ngày nhận lương</label>
+              <input id="paydayInput" type="number" min="1" max="31" class="w-full mt-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none" />
+            </div>
+            <div>
+              <label class="text-sm font-bold text-slate-600">Ngày tổng kết chu kỳ</label>
+              <input id="cycleEndInput" type="number" min="1" max="31" class="w-full mt-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none" />
+            </div>
+          </div>
 
-</script>
-<script src="/env.js"></script>
-<script
-    type="module"
-    src="/js/app.js"
-></script>
+          <div>
+            <label class="text-sm font-bold text-slate-600">Hũ tiết kiệm ban đầu</label>
+            <input id="savingsInput" type="text" oninput="formatCurrencyInput(this)" class="w-full mt-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none" placeholder="2.000.000" />
+          </div>
 
+          <div class="pt-2">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-black text-lg">Chi phí cố định</h3>
+              <button onclick="addFixedCostRow()" class="px-4 py-2 rounded-2xl bg-indigo-600 text-white text-sm font-bold">+ Thêm</button>
+            </div>
+            <div id="fixedCostsList" class="space-y-3"></div>
+          </div>
+
+          <button onclick="saveSettings()" class="w-full py-4 rounded-2xl bg-slate-900 text-white font-black text-lg">Lưu thiết lập</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/env.js"></script>
+  <script type="module" src="/js/app.js"></script>
 </body>
 </html>
