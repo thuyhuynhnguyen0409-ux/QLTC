@@ -128,3 +128,4 @@ export function renderExpenseList() {
     </div>
   `).join('');
 }
+}
