@@ -68,6 +68,7 @@ export function fillSettingsForm() {
 }
 
 export async function loadSettings() {
+  state.setFixedCosts(fixedData || [])
   if (!state.user) return state.settings;
 
   const { data: settingsRow, error } = await supabase

@@ -8,6 +8,11 @@ function setText(id, value) {
 }
 
 export function updateHomeUI() {
+  console.log('STATE:', {
+    cycle: state.currentCycle,
+    expenses: state.expenses,
+    budget: state.todayBudget
+  });
   const daily = Number(state.todayBudget?.remaining || 0);
   const spentToday = Number(state.todayBudget?.spent || 0);
   const cycleRemaining = Number(state.currentCycle?.remaining_money || 0);
@@ -19,10 +24,10 @@ export function updateHomeUI() {
   setText(
     'nextDailyBudget',
     formatMoney(
-        state.todayBudget
-            ?.nextDailyBudget || 0
+      state.todayBudget
+        ?.nextDailyBudget || 0
     )
-);
+  );
   setText('currentSavingsDisplay', formatMoney(savings));
   setText('salaryDisplay', formatMoney(state.settings?.salary || 0));
   setText('fixedCostsDisplay', formatMoney(state.currentCycle?.total_fixed || 0));
@@ -41,6 +46,61 @@ export function updateHomeUI() {
     cycleRemaining,
     savings
   );
+  // ===== TỔNG KẾT NHANH =====
+
+const income =
+    Number(
+        state.settings?.salary || 0
+    );
+
+const fixed =
+    state.fixedCosts.reduce(
+        (sum, item) =>
+            sum + Number(item.amount || 0),
+        0
+    );
+
+const spentToday =
+    Number(
+        state.todayBudget?.spent || 0
+    );
+
+const saving =
+    Number(
+        state.settings
+            ?.current_savings || 0
+    );
+
+const nextBudget =
+    Number(
+        state.todayBudget
+            ?.nextDailyBudget || 0
+    );
+
+setText(
+    'summaryIncome',
+    formatMoney(income)
+);
+
+setText(
+    'summaryFixed',
+    formatMoney(fixed)
+);
+
+setText(
+    'summarySpentToday',
+    formatMoney(spentToday)
+);
+
+setText(
+    'summarySaving',
+    formatMoney(saving)
+);
+
+setText(
+    'summaryNextBudget',
+    formatMoney(nextBudget)
+);
 }
 
 export function renderExpenseList() {
