@@ -114,7 +114,7 @@ export function updateHomeUI() {
     );
 
   setText(
-    'summaryIncome',
+    'summarySalary',
     formatMoney(income)
   );
 
@@ -124,17 +124,17 @@ export function updateHomeUI() {
   );
 
   setText(
-    'summarySpentToday',
+    'summarySpent',
     formatMoney(spentToday)
   );
 
   setText(
-    'summarySaving',
+    'summarySavings',
     formatMoney(saving)
   );
 
   setText(
-    'summaryNextBudget',
+    'nextDailyBudget',
     formatMoney(nextBudget)
   );
 
