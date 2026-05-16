@@ -208,28 +208,66 @@
           <button id="btnSuggest" onclick="suggestFood()"
             class="w-full mt-5 bg-white text-emerald-700 py-4 rounded-2xl font-black">🍚 Gợi ý món ăn</button>
         </section>
-
         <section class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-8 shadow-sm border border-slate-100">
-          <h3 class="font-black text-xl mb-5">Tổng kết nhanh</h3>
-          <div class="space-y-3 text-sm">
-            <div class="flex justify-between"><span class="text-slate-500">Thu nhập</span><b id="summarySalary">0đ</b>
-            </div>
-            <div class="flex justify-between text-sm mt-3">
 
+          <h3 class="font-black text-xl mb-5">
+            Tổng kết nhanh
+          </h3>
+
+          <div class="space-y-3 text-sm">
+
+            <div class="flex justify-between">
               <span class="text-slate-500">
-                Mức chi tiêu ngày tiếp theo
+                Thu nhập
               </span>
-              <div class="flex justify-between"><span class="text-slate-500">Mức chi tiêu những ngày sau</span><b
-                  id="nextDailyBudget">0đ</b>
-              </div>
+
+              <b id="summarySalary">
+                0đ
+              </b>
             </div>
-            <div class="flex justify-between"><span class="text-slate-500">Phí cố định</span><b id="summaryFixed">0đ</b>
+
+            <div class="flex justify-between">
+              <span class="text-slate-500">
+                Mức chi tiêu những ngày sau
+              </span>
+
+              <b id="nextDailyBudget" class="text-indigo-600">
+                0đ
+              </b>
             </div>
-            <div class="flex justify-between"><span class="text-slate-500">Đã chi hôm nay</span><b
-                id="summarySpent">0đ</b></div>
-            <div class="flex justify-between"><span class="text-slate-500">Tiết kiệm hiện tại</span><b
-                id="summarySavings">0đ</b></div>
+
+            <div class="flex justify-between">
+              <span class="text-slate-500">
+                Phí cố định
+              </span>
+
+              <b id="summaryFixed">
+                0đ
+              </b>
+            </div>
+
+            <div class="flex justify-between">
+              <span class="text-slate-500">
+                Đã chi hôm nay
+              </span>
+
+              <b id="summarySpent">
+                0đ
+              </b>
+            </div>
+
+            <div class="flex justify-between">
+              <span class="text-slate-500">
+                Tiết kiệm hiện tại
+              </span>
+
+              <b id="summarySavings">
+                0đ
+              </b>
+            </div>
+
           </div>
+
         </section>
       </div>
     </div>
