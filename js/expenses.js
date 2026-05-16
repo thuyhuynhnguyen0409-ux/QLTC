@@ -316,7 +316,7 @@ export async function renderExpenseList() {
           <div class="flex gap-2 mt-3 justify-end">
             <button
               class="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-500 text-white"
-              onclick='openEditExpense(${JSON.stringify(exp)})'
+              onclick="openEditExpense('${exp.id}')"
             >
               Sửa
             </button>
@@ -351,7 +351,34 @@ window.deleteExpense = deleteExpense;
 window.editExpense = editExpense;
 window.transferSavingsToBudget = transferSavingsToBudget;
 window.renderExpenseList = renderExpenseList;
+window.openEditExpense = function(id) {
 
+    const exp =
+        state.expenses.find(
+            e => e.id === id
+        );
+
+    if (!exp) return;
+
+    document.getElementById(
+        'expName'
+    ).value = exp.name;
+
+    document.getElementById(
+        'expAmount'
+    ).value = exp.amount;
+
+    document.getElementById(
+        'expCategory'
+    ).value = exp.category;
+
+    window.editingExpenseId = id;
+
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
 export function toggleEditExpenseModal(show) {
 
   document

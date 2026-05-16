@@ -46,62 +46,51 @@ export function updateHomeUI() {
     cycleRemaining,
     savings
   );
-  // ===== TỔNG KẾT NHANH =====
+// ===== TỔNG KẾT NHANH =====
 
 const income =
-    Number(
-        state.settings?.salary || 0
-    );
+  Number(state.settings?.salary || 0);
 
 const fixed =
-    state.fixedCosts.reduce(
-        (sum, item) =>
-            sum + Number(item.amount || 0),
-        0
-    );
-
-const spentToday =
-    Number(
-        state.todayBudget?.spent || 0
-    );
+  state.fixedCosts.reduce(
+    (sum, item) =>
+      sum + Number(item.amount || 0),
+    0
+  );
 
 const saving =
-    Number(
-        state.settings
-            ?.current_savings || 0
-    );
+  Number(state.currentSavings || 0);
 
 const nextBudget =
-    Number(
-        state.todayBudget
-            ?.nextDailyBudget || 0
-    );
+  Number(
+    state.todayBudget
+      ?.nextDailyBudget || 0
+  );
 
 setText(
-    'summaryIncome',
-    formatMoney(income)
+  'summaryIncome',
+  formatMoney(income)
 );
 
 setText(
-    'summaryFixed',
-    formatMoney(fixed)
+  'summaryFixed',
+  formatMoney(fixed)
 );
 
 setText(
-    'summarySpentToday',
-    formatMoney(spentToday)
+  'summarySpentToday',
+  formatMoney(spentToday)
 );
 
 setText(
-    'summarySaving',
-    formatMoney(saving)
+  'summarySaving',
+  formatMoney(saving)
 );
 
 setText(
-    'summaryNextBudget',
-    formatMoney(nextBudget)
+  'summaryNextBudget',
+  formatMoney(nextBudget)
 );
-}
 
 export function renderExpenseList() {
   const wrap = document.getElementById('expenseList');
@@ -131,7 +120,7 @@ export function renderExpenseList() {
         <div class="text-right">
           <div class="font-black text-rose-500">${Number(exp.amount || 0).toLocaleString('vi-VN')}đ</div>
           <div class="flex gap-2 mt-3 justify-end">
-            <button class="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-500 text-white" onclick='openEditExpense(${JSON.stringify(exp)})'">Sửa</button>
+            <button class="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-500 text-white" onclick="openEditExpense('${exp.id}')">Sửa</button>
             <button class="px-3 py-1 rounded-xl text-xs font-bold bg-rose-500 text-white" onclick="deleteExpense('${exp.id}')">Xóa</button>
           </div>
         </div>
