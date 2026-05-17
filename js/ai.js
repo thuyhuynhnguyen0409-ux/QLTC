@@ -76,10 +76,20 @@ export async function parseBillWithAI(text) {
 
   const apiKey = window.ENV?.VITE_GEMINI_API_KEY;
 
-  const prompt = `
+const prompt = `
 Bạn là AI đọc hóa đơn.
 
-Chỉ trả về JSON hợp lệ:
+Chỉ lấy:
+- tên sản phẩm
+- giá tiền
+
+❗ QUAN TRỌNG:
+- bỏ dòng lỗi, chữ rác
+- bỏ quảng cáo, QR
+- chỉ lấy dòng có số tiền rõ ràng
+- tên ngắn gọn
+
+Trả JSON:
 
 {
   "items": [
@@ -88,14 +98,11 @@ Chỉ trả về JSON hợp lệ:
   "total": 15000
 }
 
-- Bỏ dòng không phải sản phẩm
-- Chỉ lấy dòng có số tiền
-- Không markdown
+Nếu không chắc → bỏ qua dòng đó
 
 TEXT:
 ${text}
-`;
-
+`
   try {
 
     const res = await fetch(

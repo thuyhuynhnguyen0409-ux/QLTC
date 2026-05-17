@@ -2,50 +2,45 @@ import { formatMoney } from './utils.js'
 import { parseBillWithAI } from './ai.js'
 
 export function initBillScanner() {
-
   const input = document.getElementById('billInput')
   if (!input) return
 
-  input.addEventListener('change', async (e) => {
-
+  input.addEventListener('change', async e => {
     const file = e.target.files[0]
     if (!file) return
-
     await scanBill(file)
   })
 }
 
 // ======================
 async function scanBill(file) {
-
   const resultBox = document.getElementById('billResult')
 
   try {
-
-    console.log('🚀 USING GOOGLE VISION')
+    console.log('🧠 USING TESSERACT FREE')
 
     resultBox.classList.remove('hidden')
     resultBox.innerHTML = '⏳ Đang đọc bill...'
 
-    const base64 = await fileToBase64(file)
+    const { createWorker } = await import(
+      'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.esm.min.js'
+    )
 
-    const res = await fetch('/api/vision', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image: base64.split(',')[1]
-      })
-    })
+    const worker = await createWorker('vie+eng')
 
-    const data = await res.json()
+    const { data } = await worker.recognize(file)
 
-    if (!res.ok) {
-      throw new Error(data.error || 'Vision error')
-    }
+    await worker.terminate()
 
-    const ocrText = data.text
+    const rawText = data.text || ''
+    console.log('RAW OCR:', rawText)
 
-    console.log('VISION TEXT:', ocrText)
+    // 👉 lấy TOTAL từ raw (chưa clean)
+    const totalFromText = extractTotal(rawText)
+
+    // 👉 clean để gửi AI
+    const ocrText = cleanOCRText(rawText)
+    console.log('CLEAN OCR:', ocrText)
 
     if (!ocrText) {
       resultBox.innerHTML = '❌ Không đọc được chữ'
@@ -61,29 +56,56 @@ async function scanBill(file) {
       return
     }
 
+    // 👉 override total nếu detect được
+    if (totalFromText) {
+      result.total = totalFromText
+    }
+
     renderBillResult(result)
 
   } catch (err) {
-
     console.error('BILL ERROR:', err)
-
     resultBox.innerHTML = '❌ Lỗi xử lý bill'
   }
 }
 
 // ======================
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
+function cleanOCRText(text) {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => {
+
+      const hasMoney = /\d{1,3}(?:[.,]\d{3})+/.test(line)
+
+      const isTrash =
+        line.length < 3 ||
+        /QR|quét|cảm ơn|www|http|voucher|khuyến mãi/i.test(line)
+
+      return hasMoney && !isTrash
+    })
+    .join('\n')
+}
+
+// ======================
+function extractTotal(text) {
+  const lines = text.split('\n')
+
+  const totalLine = lines.find(line =>
+    /(tổng|thanh toán|phải thanh toán|thành tiền)/i.test(line)
+  )
+
+  if (!totalLine) return null
+
+  const match = totalLine.match(/\d{1,3}(?:[.,]\d{3})+/)
+
+  return match
+    ? Number(match[0].replace(/[.,]/g, ''))
+    : null
 }
 
 // ======================
 function renderBillResult(data) {
-
   const resultBox = document.getElementById('billResult')
 
   const items = data.items || []
@@ -118,33 +140,31 @@ function renderBillResult(data) {
   document.getElementById('applyBillBtn')
     .addEventListener('click', () => {
 
-      const rows =
-        document.querySelectorAll('#billItems .bill-item')
+      const rows = document.querySelectorAll('#billItems .bill-item')
 
       let names = []
       let total = 0
 
       rows.forEach(row => {
-
-        const name =
-          row.querySelector('.bill-name').value
+        const name = row.querySelector('.bill-name').value.trim()
 
         const price =
-          Number(row.querySelector('.bill-price').value) || 0
+          Number(
+            row.querySelector('.bill-price').value.replace(/[.,]/g, '')
+          ) || 0
 
         if (name) {
           names.push(name)
           total += price
         }
       })
-      console.log('VISION RAW:', data)
+
       fillBillToUI(names, total)
     })
 }
 
 // ======================
 function fillBillToUI(names, total) {
-
   document.getElementById('expName').value =
     names.join(', ') || 'Mua hàng'
 
