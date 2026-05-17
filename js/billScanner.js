@@ -2,8 +2,6 @@ import { formatMoney } from './utils.js'
 import { parseBillWithAI } from './ai.js'
 
 // ======================
-// INIT
-// ======================
 export function initBillScanner() {
 
   const input = document.getElementById('billInput')
@@ -19,21 +17,58 @@ export function initBillScanner() {
 }
 
 // ======================
-// MAIN FLOW
+async function preprocessImage(file) {
+
+  return new Promise((resolve) => {
+
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+
+    img.onload = () => {
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      ctx.drawImage(img, 0, 0);
+
+      const imageData =
+        ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const avg =
+          (data[i] + data[i + 1] + data[i + 2]) / 3;
+
+        data[i] = avg;
+        data[i + 1] = avg;
+        data[i + 2] = avg;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      canvas.toBlob(resolve);
+    };
+  });
+}
+
 // ======================
 async function scanBill(file) {
 
   const resultBox = document.getElementById('billResult')
-  if (!resultBox) return
 
   try {
 
     resultBox.classList.remove('hidden')
     resultBox.innerHTML = '⏳ Đang đọc bill...'
 
-    // ❗ DÙNG GLOBAL TESSERACT
+    const processed = await preprocessImage(file)
+
     const { data } = await window.Tesseract.recognize(
-      file,
+      processed,
       'vie+eng'
     )
 
@@ -56,13 +91,10 @@ async function scanBill(file) {
 
     console.error('SCAN ERROR:', err)
 
-    resultBox.innerHTML =
-      '❌ Lỗi xử lý bill<br><small>Xem console</small>'
+    resultBox.innerHTML = '❌ Lỗi xử lý bill'
   }
 }
 
-// ======================
-// RENDER UI
 // ======================
 function renderBillResult(data) {
 
@@ -75,44 +107,29 @@ function renderBillResult(data) {
     items.reduce((s, i) => s + Number(i.price || 0), 0)
 
   resultBox.innerHTML = `
-    <h4 class="font-black mb-2">
-      🧾 Kết quả đọc bill
-    </h4>
+    <h4 class="font-black mb-2">🧾 Kết quả</h4>
 
     <div id="billItems" class="space-y-2">
       ${items.map(item => `
         <div class="grid grid-cols-2 gap-2 bill-item">
-          <input
-            class="bill-name p-3 rounded-xl border"
-            value="${item.name || ''}"
-          />
-
-          <input
-            class="bill-price p-3 rounded-xl border"
-            value="${item.price || 0}"
-          />
+          <input class="bill-name p-3 border rounded-xl" value="${item.name || ''}" />
+          <input class="bill-price p-3 border rounded-xl" value="${item.price || 0}" />
         </div>
       `).join('')}
     </div>
 
     <div class="flex justify-between font-black pt-3">
-      <span>Tổng tiền</span>
-      <span id="billTotal">${formatMoney(total)}</span>
+      <span>Tổng</span>
+      <span>${formatMoney(total)}</span>
     </div>
 
-    <button
-      id="applyBillBtn"
-      class="w-full mt-3 bg-indigo-600 text-white p-3 rounded-2xl font-black"
-    >
-      Dùng kết quả này
+    <button id="applyBillBtn"
+      class="w-full mt-3 bg-indigo-600 text-white p-3 rounded-2xl">
+      Dùng kết quả
     </button>
   `
 
-  // ======================
-  // APPLY TO FORM
-  // ======================
-  document
-    .getElementById('applyBillBtn')
+  document.getElementById('applyBillBtn')
     .addEventListener('click', () => {
 
       const rows =
@@ -127,9 +144,7 @@ function renderBillResult(data) {
           row.querySelector('.bill-name').value
 
         const price =
-          Number(
-            row.querySelector('.bill-price').value
-          ) || 0
+          Number(row.querySelector('.bill-price').value) || 0
 
         if (name) {
           names.push(name)
@@ -142,23 +157,13 @@ function renderBillResult(data) {
 }
 
 // ======================
-// FILL FORM CHÍNH
-// ======================
 function fillBillToUI(names, total) {
 
-  const nameInput = document.getElementById('expName')
-  const amountInput = document.getElementById('expAmount')
-  const categoryInput = document.getElementById('expCategory')
-
-  if (!nameInput || !amountInput) return
-
-  nameInput.value =
+  document.getElementById('expName').value =
     names.join(', ') || 'Mua hàng'
 
-  amountInput.value =
+  document.getElementById('expAmount').value =
     Math.floor(total).toLocaleString('vi-VN')
 
-  if (categoryInput) {
-    categoryInput.value = 'food'
-  }
+  document.getElementById('expCategory').value = 'food'
 }

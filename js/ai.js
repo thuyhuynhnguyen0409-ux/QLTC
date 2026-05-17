@@ -142,3 +142,59 @@ ${ocrText}
     return null;
   }
 }
+export async function parseBillWithAI(text) {
+
+  const apiKey = window.ENV?.VITE_GEMINI_API_KEY;
+
+  const prompt = `
+Bạn là AI đọc hóa đơn.
+
+Chỉ trả về JSON hợp lệ:
+
+{
+  "items": [
+    { "name": "rau muống", "price": 5000 }
+  ],
+  "total": 15000
+}
+
+- Bỏ dòng không phải sản phẩm
+- Chỉ lấy dòng có số tiền
+- Không markdown
+
+TEXT:
+${text}
+`;
+
+  try {
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    let raw =
+      data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    console.log('AI RAW:', raw);
+
+    raw = raw
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim();
+
+    return JSON.parse(raw);
+
+  } catch (err) {
+    console.error('AI ERROR:', err);
+    return null;
+  }
+}
