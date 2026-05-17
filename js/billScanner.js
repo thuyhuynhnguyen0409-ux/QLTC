@@ -67,18 +67,15 @@ function cleanOCRText(text) {
     .map(line => line.trim())
     .filter(line => {
 
-      // 👉 match cả số kiểu: 15000 hoặc 15.000
-      const hasMoney = /\d{3,}/.test(line)
-
+      // bỏ dòng cực rác thôi
       const isTrash =
-        line.length < 3 ||
-        /QR|quét|cảm ơn|www|http|voucher|khuyến mãi|dự thưởng/i.test(line)
+        line.length < 2 ||
+        /QR|www|http/i.test(line)
 
-      return hasMoney && !isTrash
+      return !isTrash
     })
     .join('\n')
 }
-
 // ======================
 function extractTotal(text) {
   const match = text.match(/(tổng|thanh toán|phải thanh toán|thành tiền).*?(\d+)/i)
