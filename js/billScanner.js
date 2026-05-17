@@ -22,8 +22,9 @@ async function scanBill(file) {
     resultBox.classList.remove('hidden')
     resultBox.innerHTML = '⏳ Đang đọc bill...'
 
-    // ✅ FIX: dùng trực tiếp Tesseract global
-    const { data } = await Tesseract.recognize(file, 'vie+eng')
+    const processedFile = await preprocessImage(file)
+
+    const { data } = await Tesseract.recognize(processedFile, 'vie+eng')
 
     const rawText = data.text || ''
     console.log('RAW OCR:', rawText)
@@ -61,37 +62,30 @@ async function scanBill(file) {
 
 // ======================
 function cleanOCRText(text) {
-    return text
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => {
 
-            const hasMoney = /\d{1,3}(?:[.,]\d{3})+/.test(line)
+      // 👉 match cả số kiểu: 15000 hoặc 15.000
+      const hasMoney = /\d{3,}/.test(line)
 
-            const isTrash =
-                line.length < 3 ||
-                /QR|quét|cảm ơn|www|http|voucher|khuyến mãi/i.test(line)
+      const isTrash =
+        line.length < 3 ||
+        /QR|quét|cảm ơn|www|http|voucher|khuyến mãi|dự thưởng/i.test(line)
 
-            return hasMoney && !isTrash
-        })
-        .join('\n')
+      return hasMoney && !isTrash
+    })
+    .join('\n')
 }
 
 // ======================
 function extractTotal(text) {
-    const lines = text.split('\n')
+  const match = text.match(/(tổng|thanh toán|phải thanh toán|thành tiền).*?(\d+)/i)
 
-    const totalLine = lines.find(line =>
-        /(tổng|thanh toán|phải thanh toán|thành tiền)/i.test(line)
-    )
-
-    if (!totalLine) return null
-
-    const match = totalLine.match(/\d{1,3}(?:[.,]\d{3})+/)
-
-    return match
-        ? Number(match[0].replace(/[.,]/g, ''))
-        : null
+  return match
+    ? Number(match[2].replace(/[.,]/g, ''))
+    : null
 }
 
 // ======================
@@ -162,4 +156,38 @@ function fillBillToUI(names, total) {
         Math.floor(total).toLocaleString('vi-VN')
 
     document.getElementById('expCategory').value = 'food'
+}
+async function preprocessImage(file) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.src = URL.createObjectURL(file)
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+
+      canvas.width = img.width
+      canvas.height = img.height
+
+      ctx.drawImage(img, 0, 0)
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const data = imageData.data
+
+      for (let i = 0; i < data.length; i += 4) {
+        const avg = (data[i] + data[i+1] + data[i+2]) / 3
+
+        // 👉 tăng tương phản
+        const val = avg > 140 ? 255 : 0
+
+        data[i] = val
+        data[i+1] = val
+        data[i+2] = val
+      }
+
+      ctx.putImageData(imageData, 0, 0)
+
+      canvas.toBlob(resolve)
+    }
+  })
 }
