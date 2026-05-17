@@ -68,3 +68,117 @@ button:active {
     transform: translateY(0);
   }
 }
+/* ===== RESET NHẸ ===== */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* ===== CARD ===== */
+.card-soft {
+  transition: all 0.2s ease;
+}
+
+.card-soft:active {
+  transform: scale(0.98);
+}
+
+/* ===== BUTTON ===== */
+button {
+  transition: all 0.15s ease;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* ===== INPUT ===== */
+input, textarea, select {
+  font-size: 16px; /* tránh zoom trên iPhone */
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
+}
+
+/* ===== AI BOX SCROLL ===== */
+#aiChefText {
+  scrollbar-width: thin;
+}
+
+#aiChefText::-webkit-scrollbar {
+  width: 4px;
+}
+
+#aiChefText::-webkit-scrollbar-thumb {
+  background: #cbd5f5;
+  border-radius: 10px;
+}
+
+/* ===== FADE CUỐI BOX (ĐẸP HƠN) ===== */
+#aiChefText {
+  position: relative;
+}
+
+#aiChefText::after {
+  content: "";
+  position: sticky;
+  bottom: 0;
+  display: block;
+  height: 20px;
+  background: linear-gradient(to top, white, transparent);
+}
+
+/* ===== LOADING TEXT ===== */
+.loading {
+  animation: pulse 1.2s infinite;
+  color: #64748b;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4 }
+  50% { opacity: 1 }
+  100% { opacity: 0.4 }
+}
+
+/* ===== MOBILE SPACING ===== */
+@media (max-width: 640px) {
+  .mobile-padding {
+    padding: 12px;
+  }
+
+  .mobile-text {
+    font-size: 14px;
+  }
+}
+
+/* ===== CHART CENTER TEXT ===== */
+#chartCenterValue {
+  line-height: 1.2;
+}
+
+/* ===== MODAL (NẾU DÙNG) ===== */
+.modal-panel {
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ===== SMOOTH SCROLL ===== */
+html {
+  scroll-behavior: smooth;
+}
