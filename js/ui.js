@@ -52,6 +52,12 @@ export function updateHomeUI() {
   );
 
   setText(
+    'nextDailyBudget',
+    formatMoney(
+      state.todayBudget?.nextDailyBudget || 0
+    )
+  );
+  setText(
     'currentSavingsDisplay',
     formatMoney(savings)
   );
@@ -137,7 +143,10 @@ export function updateHomeUI() {
     'nextDailyBudgetSummary',
     formatMoney(nextBudget)
   );
-
+  setText(
+    'nextDailyBudget',
+    formatMoney(nextBudget)
+  );
 } // <- PHẢI CÓ DẤU NÀY
 
 export function renderExpenseList() {
