@@ -15,17 +15,30 @@ export async function suggestFood() {
     return false;
   }
 
-  const prompt = `
-Gợi ý 1 mâm cơm Việt Nam gồm:
-- món mặn
-- món canh
-- món rau/xào
+const prompt = `
+Bạn là AI đọc hóa đơn.
 
-Ngân sách còn lại: ${budget.toLocaleString('vi-VN')} VNĐ
-Yêu cầu thêm: ${note || 'không có'}
+Chỉ lấy:
+- tên sản phẩm
+- giá tiền
 
-Trả lời ngắn gọn, dễ làm, tiếng Việt.
-`;
+❗ QUAN TRỌNG:
+- bỏ dòng rác
+- chỉ lấy dòng có số tiền
+- tên ngắn gọn
+
+Trả JSON:
+
+{
+  "items": [
+    { "name": "rau muống", "price": 5000 }
+  ],
+  "total": 15000
+}
+
+TEXT:
+${text}
+`
 
   try {
     if (btn) {
