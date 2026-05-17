@@ -62,39 +62,45 @@ async function scanBill(file) {
 
   try {
 
-    resultBox.classList.remove('hidden')
     resultBox.innerHTML = '⏳ Đang đọc bill...'
 
-    const processed = await preprocessImage(file)
+    const base64 = await fileToBase64(file)
 
-    const { data } = await window.Tesseract.recognize(
-      processed,
-      'vie+eng'
-    )
+    const res = await fetch('/api/vision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: base64.split(',')[1]
+      })
+    })
+
+    const data = await res.json()
 
     const ocrText = data.text
 
-    console.log('OCR TEXT:', ocrText)
+    console.log('VISION TEXT:', ocrText)
 
     resultBox.innerHTML = '🤖 Đang phân tích...'
 
     const result = await parseBillWithAI(ocrText)
 
-    if (!result) {
-      resultBox.innerHTML = '❌ AI không hiểu bill'
-      return
-    }
-
     renderBillResult(result)
 
   } catch (err) {
 
-    console.error('SCAN ERROR:', err)
+    console.error(err)
 
     resultBox.innerHTML = '❌ Lỗi xử lý bill'
   }
 }
-
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 // ======================
 function renderBillResult(data) {
 
