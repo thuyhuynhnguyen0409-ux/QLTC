@@ -1,84 +1,74 @@
 import * as state from './state.js';
 
 export async function suggestFood() {
-  const output = document.getElementById('aiChefText');
-  const btn = document.getElementById('btnSuggest');
 
-  if (!output) return false;
+  const output = document.getElementById('aiChefText')
+  const btn = document.getElementById('btnSuggest')
 
-  const apiKey = window.ENV?.VITE_GEMINI_API_KEY || '';
-  const note = document.getElementById('chefNote')?.value?.trim() || '';
-  const budget = Math.max(0, Number(state.todayBudget?.remaining || 0));
+  if (!output) return
+
+  const apiKey = window.ENV?.VITE_GEMINI_API_KEY || ''
+  const note = document.getElementById('chefNote')?.value?.trim() || ''
+
+  // 👉 FIX: lấy ngân sách
+  const budget = Math.max(0, Number(state.todayBudget?.remaining || 0))
 
   if (!apiKey) {
-    output.innerText = 'Thiếu Gemini API key.';
-    return false;
+    output.innerText = 'Thiếu Gemini API key.'
+    return
   }
 
-const prompt = `
-Bạn là AI đọc hóa đơn.
+  const prompt = `
+Gợi ý món ăn Việt Nam (1–3 món ăn tuỳ kinh phí)
 
-Chỉ lấy:
-- tên sản phẩm
-- giá tiền
+Ngân sách còn lại: ${budget.toLocaleString('vi-VN')} VNĐ
 
-❗ QUAN TRỌNG:
-- bỏ dòng rác
-- chỉ lấy dòng có số tiền
-- tên ngắn gọn
+Yêu cầu:
+${note || 'món gì cũng được'}
 
-Trả JSON:
+QUY TẮC:
+- Gợi ý dựa trên ngân sách còn lại là chủ yếu
+- có hướng dẫn cách nấu ngắn gọn đơn giản
+- có giá tiền của nguyên liệu ( giá trung bình thôi)
 
-{
-  "items": [
-    { "name": "rau muống", "price": 5000 }
-  ],
-  "total": 15000
-}
-
-TEXT:
-${text}
+Trả lời ngắn gọn.
 `
 
   try {
+
     if (btn) {
-      btn.disabled = true;
-      btn.innerText = 'Đang gợi ý...';
+      btn.disabled = true
+      btn.innerText = 'Đang gợi ý...'
     }
 
-    const response = await fetch(
+    output.innerText = '🤖 AI đang suy nghĩ...'
+
+    const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }]
-            }
-          ]
+          contents: [{ parts: [{ text: prompt }] }]
         })
       }
-    );
+    )
 
-    const data = await response.json();
+    const data = await res.json()
 
-    if (data.error) {
-      output.innerText = `Gemini lỗi: ${data.error.message}`;
-      return false;
-    }
+    const text =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      'Không có gợi ý'
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Không nhận được phản hồi AI';
-    output.innerText = text;
-    return true;
-  } catch (error) {
-    console.error(error);
-    output.innerText = 'Không thể kết nối Gemini API';
-    return false;
+    output.innerText = text
+
+  } catch (err) {
+    console.error(err)
+    output.innerText = '❌ Lỗi AI'
   } finally {
     if (btn) {
-      btn.disabled = false;
-      btn.innerText = '🍚 Gợi ý món ăn';
+      btn.disabled = false
+      btn.innerText = '🍚 Gợi ý món ăn'
     }
   }
 }
@@ -89,7 +79,7 @@ export async function parseBillWithAI(text) {
 
   const apiKey = window.ENV?.VITE_GEMINI_API_KEY;
 
-const prompt = `
+  const prompt = `
 Bạn là AI đọc hóa đơn.
 
 Chỉ lấy:
