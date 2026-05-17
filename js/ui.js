@@ -45,9 +45,9 @@ export function updateHomeUI() {
   );
 
   setText(
-    'nextDailyBudget',
+    'nextDailyBudgetSummary',
     formatMoney(
-      state.todayBudget?.nextDailyBudget || 0
+      state.todayBudget?.nextDailyBudgetSummary || 0
     )
   );
 
@@ -134,7 +134,7 @@ export function updateHomeUI() {
   );
 
   setText(
-    'nextDailyBudget',
+    'nextDailyBudgetSummary',
     formatMoney(nextBudget)
   );
 
