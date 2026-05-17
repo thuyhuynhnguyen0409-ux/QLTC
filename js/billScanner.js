@@ -1,7 +1,6 @@
 import { formatMoney } from './utils.js'
 import { parseBillWithAI } from './ai.js'
 
-// ======================
 export function initBillScanner() {
 
   const input = document.getElementById('billInput')
@@ -17,51 +16,15 @@ export function initBillScanner() {
 }
 
 // ======================
-async function preprocessImage(file) {
-
-  return new Promise((resolve) => {
-
-    const img = new Image();
-    img.src = URL.createObjectURL(file);
-
-    img.onload = () => {
-
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      canvas.width = img.width;
-      canvas.height = img.height;
-
-      ctx.drawImage(img, 0, 0);
-
-      const imageData =
-        ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-      const data = imageData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const avg =
-          (data[i] + data[i + 1] + data[i + 2]) / 3;
-
-        data[i] = avg;
-        data[i + 1] = avg;
-        data[i + 2] = avg;
-      }
-
-      ctx.putImageData(imageData, 0, 0);
-
-      canvas.toBlob(resolve);
-    };
-  });
-}
-
-// ======================
 async function scanBill(file) {
 
   const resultBox = document.getElementById('billResult')
 
   try {
 
+    console.log('🚀 USING GOOGLE VISION')
+
+    resultBox.classList.remove('hidden')
     resultBox.innerHTML = '⏳ Đang đọc bill...'
 
     const base64 = await fileToBase64(file)
@@ -76,23 +39,39 @@ async function scanBill(file) {
 
     const data = await res.json()
 
+    if (!res.ok) {
+      throw new Error(data.error || 'Vision error')
+    }
+
     const ocrText = data.text
 
     console.log('VISION TEXT:', ocrText)
+
+    if (!ocrText) {
+      resultBox.innerHTML = '❌ Không đọc được chữ'
+      return
+    }
 
     resultBox.innerHTML = '🤖 Đang phân tích...'
 
     const result = await parseBillWithAI(ocrText)
 
+    if (!result) {
+      resultBox.innerHTML = '❌ AI không hiểu bill'
+      return
+    }
+
     renderBillResult(result)
 
   } catch (err) {
 
-    console.error(err)
+    console.error('BILL ERROR:', err)
 
     resultBox.innerHTML = '❌ Lỗi xử lý bill'
   }
 }
+
+// ======================
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -101,6 +80,7 @@ function fileToBase64(file) {
     reader.readAsDataURL(file)
   })
 }
+
 // ======================
 function renderBillResult(data) {
 
