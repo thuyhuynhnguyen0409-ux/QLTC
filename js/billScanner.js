@@ -137,7 +137,7 @@ function renderBillResult(data) {
           total += price
         }
       })
-
+      console.log('VISION RAW:', data)
       fillBillToUI(names, total)
     })
 }

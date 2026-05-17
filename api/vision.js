@@ -23,7 +23,10 @@ export default async function handler(req, res) {
               image: { content: image },
               features: [
                 { type: 'DOCUMENT_TEXT_DETECTION' }
-              ]
+              ],
+              imageContext: {
+                languageHints: ['vi', 'en']
+              }
             }
           ]
         })
@@ -32,14 +35,36 @@ export default async function handler(req, res) {
 
     const data = await response.json()
 
+    // 🔥 LOG DEBUG (rất quan trọng)
+    console.log('VISION RAW:', JSON.stringify(data))
+
+    // ❗ CHECK ERROR từ Google
+    if (data.error) {
+      return res.status(500).json({
+        error: data.error.message
+      })
+    }
+
+    const result = data.responses?.[0]
+
+    // 🔥 FIX QUAN TRỌNG
     const text =
-      data.responses?.[0]?.fullTextAnnotation?.text || ''
+      result?.fullTextAnnotation?.text ||
+      result?.textAnnotations?.[0]?.description ||
+      ''
+
+    if (!text) {
+      return res.status(200).json({
+        text: '',
+        warning: 'No text detected'
+      })
+    }
 
     return res.status(200).json({ text })
 
   } catch (err) {
 
-    console.error(err)
+    console.error('VISION ERROR:', err)
 
     return res.status(500).json({
       error: 'Vision API failed'
