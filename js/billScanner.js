@@ -1,12 +1,16 @@
 import { formatMoney } from './utils.js'
 import { parseBillWithAI } from './ai.js'
-import Tesseract from 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js';
-export function initBillScanner() {
-  const input = document.getElementById('billInput')
 
+// ======================
+// INIT
+// ======================
+export function initBillScanner() {
+
+  const input = document.getElementById('billInput')
   if (!input) return
 
   input.addEventListener('change', async (e) => {
+
     const file = e.target.files[0]
     if (!file) return
 
@@ -20,12 +24,15 @@ export function initBillScanner() {
 async function scanBill(file) {
 
   const resultBox = document.getElementById('billResult')
+  if (!resultBox) return
 
   try {
 
+    resultBox.classList.remove('hidden')
     resultBox.innerHTML = '⏳ Đang đọc bill...'
 
-    const { data } = await Tesseract.recognize(
+    // ❗ DÙNG GLOBAL TESSERACT
+    const { data } = await window.Tesseract.recognize(
       file,
       'vie+eng'
     )
@@ -47,9 +54,10 @@ async function scanBill(file) {
 
   } catch (err) {
 
-    console.error(err)
+    console.error('SCAN ERROR:', err)
 
-    resultBox.innerHTML = '❌ Lỗi xử lý bill'
+    resultBox.innerHTML =
+      '❌ Lỗi xử lý bill<br><small>Xem console</small>'
   }
 }
 
@@ -57,6 +65,7 @@ async function scanBill(file) {
 // RENDER UI
 // ======================
 function renderBillResult(data) {
+
   const resultBox = document.getElementById('billResult')
 
   const items = data.items || []
@@ -66,7 +75,7 @@ function renderBillResult(data) {
     items.reduce((s, i) => s + Number(i.price || 0), 0)
 
   resultBox.innerHTML = `
-    <h4 class="font-black">
+    <h4 class="font-black mb-2">
       🧾 Kết quả đọc bill
     </h4>
 
@@ -93,7 +102,7 @@ function renderBillResult(data) {
 
     <button
       id="applyBillBtn"
-      class="w-full bg-indigo-600 text-white p-3 rounded-2xl font-black"
+      class="w-full mt-3 bg-indigo-600 text-white p-3 rounded-2xl font-black"
     >
       Dùng kết quả này
     </button>
@@ -106,7 +115,6 @@ function renderBillResult(data) {
     .getElementById('applyBillBtn')
     .addEventListener('click', () => {
 
-      // lấy lại dữ liệu từ input (cho phép user sửa)
       const rows =
         document.querySelectorAll('#billItems .bill-item')
 
@@ -114,6 +122,7 @@ function renderBillResult(data) {
       let total = 0
 
       rows.forEach(row => {
+
         const name =
           row.querySelector('.bill-name').value
 
