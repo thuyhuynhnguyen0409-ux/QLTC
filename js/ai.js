@@ -19,7 +19,7 @@ export async function suggestFood() {
   }
 
   const prompt = `
-Gợi ý món ăn Việt Nam (1–3 món ăn tuỳ kinh phí)
+Gợi ý về mâm cơm Việt Nam ( gồm 1–2 món ăn tuỳ kinh phí)
 
 Ngân sách còn lại: ${budget.toLocaleString('vi-VN')} VNĐ
 
