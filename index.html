@@ -106,8 +106,21 @@
               <p class="text-slate-400 mt-3 text-sm">Số tiền còn lại trong ngày</p>
             </div>
 
-            <div class="w-52 h-52 mx-auto md:mx-0">
+            <div class="relative w-52 h-52 mx-auto md:mx-0">
+
               <canvas id="mainChart"></canvas>
+
+              <!-- TEXT Ở GIỮA -->
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                <span class="text-xs text-slate-400">
+                  Còn lại
+                </span>
+
+                <b id="chartCenterValue" class="text-xl font-black text-emerald-600">
+                  0đ
+                </b>
+              </div>
+
             </div>
           </div>
 
@@ -175,6 +188,14 @@
                 <option value="other">Khác</option>
               </select>
             </div>
+            <input id="billInput" type="file" accept="image/*" capture="environment" class="hidden" />
+
+            <button type="button" onclick="document.getElementById('billInput').click()"
+              class="w-full p-4 rounded-2xl bg-amber-500 text-white font-black">
+              📸 Chụp / tải bill
+            </button>
+
+            <div id="billResult" class="hidden bg-slate-50 rounded-2xl p-4 space-y-3"></div>
             <button onclick="addExpense()" class="w-full p-4 rounded-2xl bg-indigo-600 text-white font-black">Lưu chi
               tiêu</button>
           </div>

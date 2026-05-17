@@ -14,6 +14,7 @@ import {
 } from './expenses.js'
 import './settings.js';
 import * as state from './state.js'
+import { initBillScanner } from './billScanner.js'
 window.formatCurrencyInput = formatCurrencyInput;
 
 window.toggleConfigModal = function (show) {
@@ -49,6 +50,7 @@ async function init() {
   await loadExpenses();
   await loadTodayBudget();
   updateHomeUI();
+  initBillScanner()
 }
 
 window.__refreshApp = init;

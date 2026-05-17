@@ -3,6 +3,7 @@ import * as state from './state.js';
 import { parseCurrency, getTodayString } from './utils.js';
 import { loadTodayBudget, syncTodayBudgetRow, recalcFutureBudgetsFromToday } from './budget.js';
 import { updateHomeUI } from './ui.js';
+import { showToast } from './utils.js'
 let editingExpenseId = null
 function isTodayExpense(expense) {
   return expense?.expense_date === getTodayString();
@@ -56,7 +57,7 @@ export async function addExpense(name, amount, category) {
     }])
     .select()
     .single();
-
+   
   if (error) {
     console.error(error);
     alert('Không thể thêm chi tiêu');
@@ -91,7 +92,26 @@ export async function addExpense(name, amount, category) {
   await recalcFutureBudgetsFromToday();
   await loadTodayBudget();
   updateHomeUI();
+   showToast('Đã lưu chi tiêu ✅')
+// ===== RESET FORM =====
+document.getElementById('expName').value = ''
+document.getElementById('expAmount').value = ''
+document.getElementById('expCategory').value = 'food'
 
+// ===== RESET BILL SCAN =====
+const billBox = document.getElementById('billResult')
+if (billBox) {
+  billBox.innerHTML = ''
+  billBox.classList.add('hidden')
+}
+
+const billInput = document.getElementById('billInput')
+if (billInput) {
+  billInput.value = ''
+}
+
+// ===== FOCUS LẠI =====
+document.getElementById('expName').focus()
   return true;
 }
 
