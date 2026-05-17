@@ -2,14 +2,14 @@ import { formatMoney } from './utils.js'
 import { parseBillWithAI } from './ai.js'
 
 export function initBillScanner() {
-  const input = document.getElementById('billInput')
-  if (!input) return
+    const input = document.getElementById('billInput')
+    if (!input) return
 
-  input.addEventListener('change', async e => {
-    const file = e.target.files[0]
-    if (!file) return
-    await scanBill(file)
-  })
+    input.addEventListener('change', async e => {
+        const file = e.target.files[0]
+        if (!file) return
+        await scanBill(file)
+    })
 }
 
 // ======================
@@ -22,23 +22,14 @@ async function scanBill(file) {
     resultBox.classList.remove('hidden')
     resultBox.innerHTML = '⏳ Đang đọc bill...'
 
-    const { createWorker } = await import(
-      'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.esm.min.js'
-    )
-
-    const worker = await createWorker('vie+eng')
-
-    const { data } = await worker.recognize(file)
-
-    await worker.terminate()
+    // ✅ FIX: dùng trực tiếp Tesseract global
+    const { data } = await Tesseract.recognize(file, 'vie+eng')
 
     const rawText = data.text || ''
     console.log('RAW OCR:', rawText)
 
-    // 👉 lấy TOTAL từ raw (chưa clean)
     const totalFromText = extractTotal(rawText)
 
-    // 👉 clean để gửi AI
     const ocrText = cleanOCRText(rawText)
     console.log('CLEAN OCR:', ocrText)
 
@@ -56,7 +47,6 @@ async function scanBill(file) {
       return
     }
 
-    // 👉 override total nếu detect được
     if (totalFromText) {
       result.total = totalFromText
     }
@@ -71,50 +61,50 @@ async function scanBill(file) {
 
 // ======================
 function cleanOCRText(text) {
-  return text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => {
+    return text
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => {
 
-      const hasMoney = /\d{1,3}(?:[.,]\d{3})+/.test(line)
+            const hasMoney = /\d{1,3}(?:[.,]\d{3})+/.test(line)
 
-      const isTrash =
-        line.length < 3 ||
-        /QR|quét|cảm ơn|www|http|voucher|khuyến mãi/i.test(line)
+            const isTrash =
+                line.length < 3 ||
+                /QR|quét|cảm ơn|www|http|voucher|khuyến mãi/i.test(line)
 
-      return hasMoney && !isTrash
-    })
-    .join('\n')
+            return hasMoney && !isTrash
+        })
+        .join('\n')
 }
 
 // ======================
 function extractTotal(text) {
-  const lines = text.split('\n')
+    const lines = text.split('\n')
 
-  const totalLine = lines.find(line =>
-    /(tổng|thanh toán|phải thanh toán|thành tiền)/i.test(line)
-  )
+    const totalLine = lines.find(line =>
+        /(tổng|thanh toán|phải thanh toán|thành tiền)/i.test(line)
+    )
 
-  if (!totalLine) return null
+    if (!totalLine) return null
 
-  const match = totalLine.match(/\d{1,3}(?:[.,]\d{3})+/)
+    const match = totalLine.match(/\d{1,3}(?:[.,]\d{3})+/)
 
-  return match
-    ? Number(match[0].replace(/[.,]/g, ''))
-    : null
+    return match
+        ? Number(match[0].replace(/[.,]/g, ''))
+        : null
 }
 
 // ======================
 function renderBillResult(data) {
-  const resultBox = document.getElementById('billResult')
+    const resultBox = document.getElementById('billResult')
 
-  const items = data.items || []
+    const items = data.items || []
 
-  const total =
-    data.total ||
-    items.reduce((s, i) => s + Number(i.price || 0), 0)
+    const total =
+        data.total ||
+        items.reduce((s, i) => s + Number(i.price || 0), 0)
 
-  resultBox.innerHTML = `
+    resultBox.innerHTML = `
     <h4 class="font-black mb-2">🧾 Kết quả</h4>
 
     <div id="billItems" class="space-y-2">
@@ -137,39 +127,39 @@ function renderBillResult(data) {
     </button>
   `
 
-  document.getElementById('applyBillBtn')
-    .addEventListener('click', () => {
+    document.getElementById('applyBillBtn')
+        .addEventListener('click', () => {
 
-      const rows = document.querySelectorAll('#billItems .bill-item')
+            const rows = document.querySelectorAll('#billItems .bill-item')
 
-      let names = []
-      let total = 0
+            let names = []
+            let total = 0
 
-      rows.forEach(row => {
-        const name = row.querySelector('.bill-name').value.trim()
+            rows.forEach(row => {
+                const name = row.querySelector('.bill-name').value.trim()
 
-        const price =
-          Number(
-            row.querySelector('.bill-price').value.replace(/[.,]/g, '')
-          ) || 0
+                const price =
+                    Number(
+                        row.querySelector('.bill-price').value.replace(/[.,]/g, '')
+                    ) || 0
 
-        if (name) {
-          names.push(name)
-          total += price
-        }
-      })
+                if (name) {
+                    names.push(name)
+                    total += price
+                }
+            })
 
-      fillBillToUI(names, total)
-    })
+            fillBillToUI(names, total)
+        })
 }
 
 // ======================
 function fillBillToUI(names, total) {
-  document.getElementById('expName').value =
-    names.join(', ') || 'Mua hàng'
+    document.getElementById('expName').value =
+        names.join(', ') || 'Mua hàng'
 
-  document.getElementById('expAmount').value =
-    Math.floor(total).toLocaleString('vi-VN')
+    document.getElementById('expAmount').value =
+        Math.floor(total).toLocaleString('vi-VN')
 
-  document.getElementById('expCategory').value = 'food'
+    document.getElementById('expCategory').value = 'food'
 }
