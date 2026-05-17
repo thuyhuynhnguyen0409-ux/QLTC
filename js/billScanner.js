@@ -1,6 +1,6 @@
 import { formatMoney } from './utils.js'
 import { parseBillWithAI } from './ai.js'
-
+import Tesseract from 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js';
 export function initBillScanner() {
   const input = document.getElementById('billInput')
 
@@ -18,18 +18,12 @@ export function initBillScanner() {
 // MAIN FLOW
 // ======================
 async function scanBill(file) {
+
   const resultBox = document.getElementById('billResult')
 
-  if (!resultBox) return
-
-  resultBox.classList.remove('hidden')
-  resultBox.innerHTML = '⏳ Đang đọc bill...'
-
   try {
-    // 1. OCR
-    const Tesseract = await import(
-      'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js'
-    )
+
+    resultBox.innerHTML = '⏳ Đang đọc bill...'
 
     const { data } = await Tesseract.recognize(
       file,
@@ -40,21 +34,21 @@ async function scanBill(file) {
 
     console.log('OCR TEXT:', ocrText)
 
-    // 2. AI parse
-    resultBox.innerHTML = '🤖 Đang phân tích bằng AI...'
+    resultBox.innerHTML = '🤖 Đang phân tích...'
 
     const result = await parseBillWithAI(ocrText)
 
     if (!result) {
-      resultBox.innerHTML = '❌ AI không đọc được bill'
+      resultBox.innerHTML = '❌ AI không hiểu bill'
       return
     }
 
-    // 3. Render UI
     renderBillResult(result)
 
   } catch (err) {
+
     console.error(err)
+
     resultBox.innerHTML = '❌ Lỗi xử lý bill'
   }
 }
